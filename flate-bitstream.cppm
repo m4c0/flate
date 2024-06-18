@@ -1,18 +1,7 @@
-module;
-#include <array>
-#include <cassert>
-#include <exception>
-#include <optional>
-
 export module flate:bitstream;
 import yoyo;
 
-export namespace zipline {
-struct truncated_stream : std::runtime_error {
-  truncated_stream()
-      : runtime_error("Attempt to read past end of bit stream") {}
-};
-
+export namespace flate {
 class bitstream {
   static constexpr const auto max_bits_at_once = 8;
   static constexpr const auto bits_per_byte = 8U;
@@ -22,21 +11,22 @@ class bitstream {
   unsigned m_rem{};
   unsigned m_buf{};
 
-  [[nodiscard]] constexpr auto next_tiny(unsigned n) {
-    assert(n <= max_bits_at_once);
-
-    if (m_rem < n) {
-      auto next = m_reader->read_u8();
-      if (!next)
-        throw truncated_stream{};
-      m_buf = m_buf + (*next << m_rem);
+  constexpr auto prepare_next(unsigned n) {
+    if (m_rem >= n)
+      return mno::req<void>{};
+    return m_reader->read_u8().map([this](auto next) {
+      m_buf = m_buf + (next << m_rem);
       m_rem += bits_per_byte;
-    }
-
-    auto res = m_buf & ((1U << n) - 1U);
-    m_rem -= n;
-    m_buf >>= n;
-    return res;
+    });
+  }
+  [[nodiscard]] constexpr auto next_tiny(unsigned n) {
+    // assert(n <= max_bits_at_once);
+    return prepare_next(n).map([n, this] {
+      auto res = m_buf & ((1U << n) - 1U);
+      m_rem -= n;
+      m_buf >>= n;
+      return res;
+    });
   }
 
 public:
@@ -47,13 +37,13 @@ public:
       auto discard = next_tiny(m_rem);
   }
 
-  template <size_t N>
+  template <unsigned N>
     requires(N <= max_bits_at_once)
   [[nodiscard]] constexpr auto next() {
     return next_tiny(N);
   }
 
-  template <size_t N> constexpr void skip() {
+  template <unsigned N> constexpr void skip() {
     auto rem = N;
     while (rem >= max_bits_at_once) {
       auto r = next<max_bits_at_once>();
@@ -62,22 +52,27 @@ public:
     auto r = next<N % max_bits_at_once>();
   }
 
-  [[nodiscard]] constexpr unsigned next(unsigned n) {
-    assert(n <= sizeof(unsigned) * bits_per_byte);
+  [[nodiscard]] constexpr mno::req<unsigned> next(unsigned n) {
+    // assert(n <= sizeof(unsigned) * bits_per_byte);
 
-    unsigned res = 0;
+    mno::req<unsigned> res{0U};
     unsigned shift = 0;
-    while (n > 0) {
+    while (n > 0 && res.is_valid()) {
       auto bits = n > bits_per_byte ? bits_per_byte : n;
-      res |= next_tiny(bits) << shift;
-      n -= bits;
-      shift += bits_per_byte;
+      res = mno::combine(
+          [&](auto acc, auto tiny) {
+            auto res = acc | (tiny << shift);
+            n -= bits;
+            shift += bits_per_byte;
+            return res;
+          },
+          res, next_tiny(bits));
     }
     return res;
   }
 
   [[nodiscard]] constexpr auto eof() const noexcept {
-    return m_reader->eof() && m_rem == 0;
+    return m_reader->eof().map([this](auto eof) { return eof && m_rem == 0; });
   }
 };
 
@@ -88,9 +83,9 @@ public:
   explicit constexpr ce_bitstream(Reader r)
       : bitstream{&m_real_reader}, m_real_reader{r} {};
 };
-} // namespace zipline
+} // namespace flate
 
-using namespace zipline;
+using namespace flate;
 
 static constexpr const yoyo::ce_reader data{0x8d, 0x52, 0x4d};
 
