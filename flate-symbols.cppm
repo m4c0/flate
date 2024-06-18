@@ -5,7 +5,7 @@ module;
 #include <span>
 #include <variant>
 
-export module deflate:symbols;
+export module flate:symbols;
 import :tables;
 import bitstream;
 import huffman;

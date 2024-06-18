@@ -5,8 +5,8 @@ module;
 #include <string_view>
 #include <variant>
 
-export module deflate;
-import :deflater;
+export module flate;
+import :flater;
 import bitstream;
 import yoyo;
 

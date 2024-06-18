@@ -2,7 +2,7 @@ module;
 #include <array>
 #include <span>
 
-export module deflate:tables;
+export module flate:tables;
 import huffman;
 
 namespace zipline::tables {

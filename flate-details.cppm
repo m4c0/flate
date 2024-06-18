@@ -4,7 +4,7 @@ module;
 #include <exception>
 #include <optional>
 
-export module deflate:details;
+export module flate:details;
 import bitstream;
 import containers;
 import huffman;

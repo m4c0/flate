@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <span>
 
-export module deflate:deflater;
+export module flate:flater;
 import :buffer;
 import :details;
 import :symbols;

@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <string_view>
 
-export module deflate:buffer;
+export module flate:buffer;
 import :symbols;
 
 namespace zipline {
