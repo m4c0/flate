@@ -13,29 +13,29 @@ struct huffman_codes {
   uint_array indexes{};
 };
 
-static constexpr auto max(const uint_array &array) {
-  unsigned max = array[0];
-  for (auto i = 1; i < array.size(); i++) {
-    if (array[i] < max)
+static constexpr auto max(const unsigned *lens, unsigned max_codes) {
+  unsigned max = lens[0];
+  for (auto i = 1; i < max_codes; i++) {
+    if (lens[i] < max)
       continue;
 
-    max = array[i];
+    max = lens[i];
   }
   return max;
 }
 
 // section 3.2.2 of RFC 1951 - using a variant based on ZLIB algorithms
-[[nodiscard]] constexpr auto create_huffman_codes(const uint_array &lengths) {
-  const auto max_codes = lengths.size();
-  const auto max_bits = max(lengths);
+[[nodiscard]] constexpr auto create_huffman_codes(const unsigned *lens,
+                                                  unsigned max_codes) {
+  const auto max_bits = max(lens, max_codes);
   huffman_codes res;
   res.counts = uint_array{max_bits + 1};
 
   for (auto &e : res.counts) {
     e = 0;
   }
-  for (auto len : lengths) {
-    res.counts[len]++;
+  for (auto i = 0; i < max_codes; i++) {
+    res.counts[lens[i]]++;
   }
 
   uint_array offsets{max_bits + 1};
@@ -46,7 +46,7 @@ static constexpr auto max(const uint_array &array) {
 
   res.indexes = uint_array{offsets[max_bits] + res.counts[max_bits]};
   for (auto n = 0; n < max_codes; n++) {
-    auto len = lengths[n];
+    auto len = lens[n];
     if (len != 0) {
       res.indexes[offsets[len]] = n;
       offsets[len]++;
@@ -96,8 +96,8 @@ static_assert([] {
   const auto expected_counts = uint_array::make(0, 0, 1, 5, 2);
   const auto expected_symbols = uint_array::make(5, 0, 1, 2, 3, 4, 6, 7);
 
-  const auto hfc =
-      create_huffman_codes(uint_array::make(3, 3, 3, 3, 3, 2, 4, 4));
+  const auto lens = uint_array::make(3, 3, 3, 3, 3, 2, 4, 4);
+  const auto hfc = create_huffman_codes(lens.begin(), lens.size());
   if (hfc.counts != expected_counts)
     return false;
   if (hfc.indexes != expected_symbols)
@@ -110,8 +110,8 @@ static_assert([] {
   const auto expected_counts = uint_array::make(4, 0, 0, 5);
   const auto expected_symbols = uint_array::make(0, 2, 4, 6, 8);
 
-  const auto hfc = create_huffman_codes(
-      uint_array::make(3U, 0U, 3U, 0U, 3U, 0U, 3U, 0U, 3U));
+  const auto lens = uint_array::make(3U, 0U, 3U, 0U, 3U, 0U, 3U, 0U, 3U);
+  const auto hfc = create_huffman_codes(lens.begin(), lens.size());
   if (hfc.counts != expected_counts)
     return false;
   if (hfc.indexes != expected_symbols)
@@ -129,8 +129,8 @@ static_assert([] {
 // 6 G 1110
 // 7 H 1111
 static_assert([] {
-  const auto hfc =
-      create_huffman_codes(uint_array::make(3, 3, 3, 3, 3, 2, 4, 4));
+  const auto lens = uint_array::make(3, 3, 3, 3, 3, 2, 4, 4);
+  const auto hfc = create_huffman_codes(lens.begin(), lens.size());
   auto r = yoyo::ce_reader{0b11100100, 0b01111011}; // NOLINT
   bitstream b{&r};
 
