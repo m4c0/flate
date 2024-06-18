@@ -6,9 +6,9 @@ module;
 #include <variant>
 
 export module flate:symbols;
+import :bitstream;
+import :huffman;
 import :tables;
-import bitstream;
-import huffman;
 import yoyo;
 
 namespace zipline::symbols {
