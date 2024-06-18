@@ -1,54 +1,55 @@
-module;
-#include <algorithm>
-#include <array>
-#include <exception>
-#include <optional>
-
 export module flate:huffman;
 import :bitstream;
-import containers;
+import hai;
 import yoyo;
 
-export namespace zipline {
-struct invalid_huffman_code : std::runtime_error {
-  invalid_huffman_code() : runtime_error("Invalid huffman code") {}
-};
+namespace flate {
+using uint_array = hai::array<unsigned>;
 
 struct huffman_codes {
   // Counts per bit length
-  containers::unique_array<unsigned> counts{};
+  uint_array counts{};
   // Symbol per offset
-  containers::unique_array<unsigned> indexes{};
+  uint_array indexes{};
 };
 
+static constexpr auto max(const uint_array &array) {
+  unsigned max = array[0];
+  for (auto i = 1; i < array.size(); i++) {
+    if (array[i] < max)
+      continue;
+
+    max = array[i];
+  }
+  return max;
+}
+
 // section 3.2.2 of RFC 1951 - using a variant based on ZLIB algorithms
-template <typename LengthArray>
-[[nodiscard]] constexpr auto create_huffman_codes(const LengthArray &lengths) {
+[[nodiscard]] constexpr auto create_huffman_codes(const uint_array &lengths) {
   const auto max_codes = lengths.size();
-  const auto max_bits = *std::max_element(lengths.begin(), lengths.end());
+  const auto max_bits = max(lengths);
   huffman_codes res;
-  res.counts = containers::unique_array<unsigned>{max_bits + 1};
+  res.counts = uint_array{max_bits + 1};
 
   for (auto &e : res.counts) {
     e = 0;
   }
   for (auto len : lengths) {
-    res.counts.at(len)++;
+    res.counts[len]++;
   }
 
-  containers::unique_array<unsigned> offsets{max_bits + 1};
-  offsets.at(1) = 0;
+  uint_array offsets{max_bits + 1};
+  offsets[1] = 0;
   for (auto bits = 1; bits < max_bits; bits++) {
-    offsets.at(bits + 1) = offsets.at(bits) + res.counts.at(bits);
+    offsets[bits + 1] = offsets[bits] + res.counts[bits];
   }
 
-  res.indexes = containers::unique_array<unsigned>{offsets.at(max_bits) +
-                                                   res.counts.at(max_bits)};
+  res.indexes = uint_array{offsets[max_bits] + res.counts[max_bits]};
   for (auto n = 0; n < max_codes; n++) {
     auto len = lengths[n];
     if (len != 0) {
-      res.indexes.at(offsets.at(len)) = n;
-      offsets.at(len)++;
+      res.indexes[offsets[len]] = n;
+      offsets[len]++;
     }
   }
 
@@ -60,35 +61,43 @@ template <typename LengthArray>
   unsigned code = 0;
   unsigned first = 0;
   unsigned index = 0;
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
   for (const auto *it = hc.counts.begin() + 1; it != hc.counts.end(); ++it) {
     auto count = *it;
 
-    code |= bits->next<1>();
+    auto b = bits->next<1>();
+    if (!b.is_valid())
+      return b;
+
+    code |= b.unwrap(0);
     if (code < first + count) {
-      return hc.indexes.at(index + code - first);
+      return mno::req{hc.indexes[index + code - first]};
     }
     index += count;
     first = (first + count) << 1U;
     code <<= 1U;
   }
-  throw invalid_huffman_code{};
+  return mno::req<unsigned>::failed("invalid huffman code");
 }
-} // namespace zipline
+} // namespace flate
 
-using namespace zipline;
+using namespace flate;
 
 static constexpr bool operator==(const auto &a, const auto &b) noexcept {
-  return std::equal(a.begin(), a.end(), b.begin(), b.end());
+  if (a.size() != b.size())
+    return false;
+  for (auto i = 0; i < a.size(); i++) {
+    if (a[i] != b[i])
+      return false;
+  }
+  return true;
 }
 // Checks huffman table construction
 static_assert([] {
-  constexpr const auto expected_counts = std::array{0, 0, 1, 5, 2};
-  constexpr const auto expected_symbols =
-      std::array<unsigned, 8>{5, 0, 1, 2, 3, 4, 6, 7};
+  const auto expected_counts = uint_array::make(0, 0, 1, 5, 2);
+  const auto expected_symbols = uint_array::make(5, 0, 1, 2, 3, 4, 6, 7);
 
   const auto hfc =
-      create_huffman_codes(std::array<unsigned, 8>{3, 3, 3, 3, 3, 2, 4, 4});
+      create_huffman_codes(uint_array::make(3, 3, 3, 3, 3, 2, 4, 4));
   if (hfc.counts != expected_counts)
     return false;
   if (hfc.indexes != expected_symbols)
@@ -98,11 +107,11 @@ static_assert([] {
 
 // Checks again with unused symbols
 static_assert([] {
-  constexpr const auto expected_counts = std::array{4, 0, 0, 5};
-  constexpr const auto expected_symbols = std::array{0, 2, 4, 6, 8};
+  const auto expected_counts = uint_array::make(4, 0, 0, 5);
+  const auto expected_symbols = uint_array::make(0, 2, 4, 6, 8);
 
-  const auto hfc =
-      create_huffman_codes(std::array{3U, 0U, 3U, 0U, 3U, 0U, 3U, 0U, 3U});
+  const auto hfc = create_huffman_codes(
+      uint_array::make(3U, 0U, 3U, 0U, 3U, 0U, 3U, 0U, 3U));
   if (hfc.counts != expected_counts)
     return false;
   if (hfc.indexes != expected_symbols)
@@ -121,11 +130,11 @@ static_assert([] {
 // 7 H 1111
 static_assert([] {
   const auto hfc =
-      create_huffman_codes(std::array<unsigned, 8>{3, 3, 3, 3, 3, 2, 4, 4});
+      create_huffman_codes(uint_array::make(3, 3, 3, 3, 3, 2, 4, 4));
   auto r = yoyo::ce_reader{0b11100100, 0b01111011}; // NOLINT
   bitstream b{&r};
 
-  constexpr const auto expected_result = std::array{5, 2, 7, 3, 6};
+  const auto expected_result = uint_array::make(5, 2, 7, 3, 6);
   for (auto er : expected_result) {
     if (decode_huffman(hfc, &b) != er)
       return false;
