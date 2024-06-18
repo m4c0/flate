@@ -3,7 +3,7 @@ module;
 #include <span>
 
 export module flate:tables;
-import huffman;
+import :huffman;
 
 namespace zipline::tables {
 struct bit_pair {

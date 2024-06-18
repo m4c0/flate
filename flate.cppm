@@ -6,8 +6,8 @@ module;
 #include <variant>
 
 export module flate;
-import :flater;
-import bitstream;
+import :bitstream;
+import :deflater;
 import yoyo;
 
 namespace zipline {

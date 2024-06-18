@@ -5,9 +5,9 @@ module;
 #include <optional>
 
 export module flate:details;
-import bitstream;
+import :bitstream;
+import :huffman;
 import containers;
-import huffman;
 import yoyo;
 
 namespace zipline::details {

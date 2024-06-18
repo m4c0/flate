@@ -5,10 +5,10 @@ module;
 #include <span>
 
 export module flate:flater;
+import :bitstream;
 import :buffer;
 import :details;
 import :symbols;
-import bitstream;
 import yoyo;
 
 namespace zipline {
