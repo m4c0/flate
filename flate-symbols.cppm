@@ -1,26 +1,21 @@
-module;
-#include <array>
-#include <cassert>
-#include <optional>
-#include <span>
-#include <variant>
-
 export module flate:symbols;
 import :bitstream;
 import :huffman;
 import :tables;
+import hai;
+import traits;
 import yoyo;
 
-namespace zipline::symbols {
-struct raw {
-  uint8_t c;
+using namespace traits::ints;
+
+namespace flate::symbols {
+enum class type { end, raw, repeat };
+struct symbol {
+  type type;
+  unsigned len{};
+  unsigned dist{};
+  uint8_t c{};
 };
-struct repeat {
-  unsigned len;
-  unsigned dist;
-};
-struct end {};
-using symbol = std::variant<end, raw, repeat>;
 
 [[nodiscard]] static constexpr auto read_fixed_dist(bitstream *bits) {
   return (bits->next<1>() << 4) | (bits->next<1>() << 3) |
@@ -38,91 +33,104 @@ static_assert(test_read_fixed_dist(0b10, 8));
 static_assert(test_read_fixed_dist(0b1, 16));
 static_assert(test_read_fixed_dist(0b11111, 31));
 
-[[nodiscard]] static constexpr symbol
+static constexpr const auto sym = [](auto... a) {
+  return mno::req<symbol>{symbol{a...}};
+};
+static constexpr mno::req<symbol> read_repeat(const tables::huff_tables &huff,
+                                              bitstream *bits, unsigned code) {
+  if (code > tables::max_lens_code)
+    return mno::req<symbol>::failed("code greater than max lens");
+
+  const auto len_bits = tables::bitlens.data[code];
+  return bits->next(len_bits.bits).fmap([&](auto l) {
+    const auto len = len_bits.second + l;
+
+    const auto dist_code = (huff.hdist.counts.size() > 0)
+                               ? decode_huffman(huff.hdist, bits)
+                               : read_fixed_dist(bits);
+    return dist_code.fmap([&](auto dist_code) {
+      if (dist_code > tables::max_dists_code)
+        return mno::req<symbol>::failed("dist code greater than max");
+
+      const auto dist_bits = tables::bitdists.data[dist_code];
+      return bits->next(dist_bits.bits).map([&](auto d) {
+        const auto dist = dist_bits.second + d;
+        return symbol{type::repeat, len, dist};
+      });
+    });
+  });
+}
+
+[[nodiscard]] static constexpr mno::req<symbol>
 read_next_symbol(const tables::huff_tables &huff, bitstream *bits) {
-  constexpr const auto end_code = 256;
+  return decode_huffman(huff.hlist, bits).fmap([&](auto code) {
+    constexpr const auto end_code = 256;
 
-  const auto code = decode_huffman(huff.hlist, bits);
-  if (code < end_code)
-    return raw{static_cast<uint8_t>(code)};
-  if (code == end_code)
-    return end{};
-  assert(code <= tables::max_lens_code);
-
-  const auto len_bits = tables::bitlens[code];
-  const auto len = len_bits.second + bits->next(len_bits.bits);
-
-  const auto dist_code = (huff.hdist.counts.size() > 0)
-                             ? decode_huffman(huff.hdist, bits)
-                             : read_fixed_dist(bits);
-  assert(dist_code <= tables::max_dists_code);
-
-  const auto dist_bits = tables::bitdists[dist_code];
-  const auto dist = dist_bits.second + bits->next(dist_bits.bits);
-  return repeat{len, dist};
+    if (code < end_code)
+      return sym(type::raw, 0U, 0U, static_cast<uint8_t>(code));
+    if (code == end_code)
+      return sym(type::end);
+    return read_repeat(huff, bits, code);
+  });
 }
+} // namespace flate::symbols
 
-static constexpr bool operator==(const raw &s, const raw &r) {
-  return s.c == r.c;
-}
-static constexpr bool operator==(const repeat &s, const repeat &r) {
-  return s.dist == r.dist && s.len == r.len;
-}
-static constexpr bool operator==(const end & /**/, const end & /**/) {
-  return true;
-}
+using namespace flate::symbols;
 
-} // namespace zipline::symbols
-
-using namespace zipline::symbols;
-
-static constexpr auto build_huffman_codes(const auto &indexes,
-                                          const auto &counts) {
-  zipline::huffman_codes huff{
-      .counts{counts.size()},
-      .indexes{indexes.size()},
-  };
-  std::copy(counts.begin(), counts.end(), huff.counts.begin());
-  std::copy(indexes.begin(), indexes.end(), huff.indexes.begin());
-  return huff;
-}
 static constexpr auto build_sparse_huff() {
   // 2-bit alignment to match a half-hex and simplify the assertion
-  constexpr const auto lit_indexes =
-      std::array<unsigned, 4>{'?', 256, 270, 285};
-  constexpr const auto dist_indexes = std::array<unsigned, 4>{2, 6};
-
-  constexpr const auto lit_counts =
-      std::array<unsigned, 3>{0, 0, lit_indexes.size()};
-  constexpr const auto dist_counts =
-      std::array<unsigned, 3>{0, 0, dist_indexes.size()};
-
-  return zipline::tables::huff_tables{
-      .hlist = build_huffman_codes(lit_indexes, lit_counts),
-      .hdist = build_huffman_codes(dist_indexes, dist_counts),
+  return flate::tables::huff_tables{
+      .hlist =
+          flate::huffman_codes{
+              hai::array<unsigned>::make(0, 0, 4),
+              hai::array<unsigned>::make('?', 256, 270, 285),
+          },
+      .hdist =
+          flate::huffman_codes{
+              hai::array<unsigned>::make(0, 0, 4),
+              hai::array<unsigned>::make(2, 6, 0, 0),
+          },
   };
 }
 static constexpr auto test_read_next_symbol(uint8_t data, symbol expected) {
-  auto bits = zipline::ce_bitstream{yoyo::ce_reader{data}};
-  auto sym = read_next_symbol(build_sparse_huff(), &bits);
-  return sym == expected;
+  auto bits = flate::ce_bitstream{yoyo::ce_reader{data}};
+  auto sym =
+      read_next_symbol(build_sparse_huff(), &bits).take([](auto) { throw 0; });
+  if (sym.type != expected.type)
+    throw 0;
+  if (sym.len != expected.len)
+    throw 0;
+  if (sym.dist != expected.dist)
+    throw 0;
+  if (sym.c != expected.c)
+    throw 0;
+  return true;
 }
-static_assert(test_read_next_symbol(0b00, raw{'?'}));             // NOLINT
-static_assert(test_read_next_symbol(0b10, end{}));                // NOLINT
-static_assert(test_read_next_symbol(0b11100101, repeat{24, 12})); // NOLINT
+static_assert(test_read_next_symbol(0b00, symbol{type::raw, 0, 0, '?'}));
+static_assert(test_read_next_symbol(0b10, symbol{type::end}));
+static_assert(test_read_next_symbol(0b11100101, symbol{type::repeat, 24, 12}));
 
 static constexpr auto test_fixed_table(uint8_t first_byte, uint8_t second_byte,
                                        symbol expected) {
-  auto bits =
-      zipline::ce_bitstream{yoyo::ce_reader{first_byte, second_byte, 0}};
+  auto bits = flate::ce_bitstream{yoyo::ce_reader{first_byte, second_byte, 0}};
   auto sym =
-      read_next_symbol(zipline::tables::create_fixed_huffman_table(), &bits);
-  return sym == expected;
+      read_next_symbol(flate::tables::create_fixed_huffman_table(), &bits)
+          .take([](auto) { throw 0; });
+  if (sym.type != expected.type)
+    throw 0;
+  if (sym.len != expected.len)
+    throw 0;
+  if (sym.dist != expected.dist)
+    throw 0;
+  if (sym.c != expected.c)
+    throw 0;
+  return true;
 }
-static_assert(test_fixed_table(0b01001100, 0, raw{2}));
-static_assert(test_fixed_table(0b10010011, 0, raw{146}));
-static_assert(test_fixed_table(0b0000000, 0, end{})); // 256
+static_assert(test_fixed_table(0b01001100, 0, symbol{type::raw, 0, 0, 2}));
+static_assert(test_fixed_table(0b10010011, 0, symbol{type::raw, 0, 0, 146}));
+static_assert(test_fixed_table(0b0000000, 0, symbol{type::end})); // 256
 static_assert(test_fixed_table(0b10100000, 0,
-                               repeat{4, 257})); // 258, dist=16,0
-static_assert(test_fixed_table(0b01000011, 0, repeat{163, 1})); // 282
-static_assert(test_fixed_table(0b01100000, 0b1000, repeat{5, 2}));
+                               symbol{type::repeat, 4, 257})); // 258, dist=16,0
+static_assert(test_fixed_table(0b01000011, 0,
+                               symbol{type::repeat, 163, 1})); // 282
+static_assert(test_fixed_table(0b01100000, 0b1000, symbol{type::repeat, 5, 2}));
