@@ -1,17 +1,13 @@
-module;
-#include <array>
-#include <cassert>
-#include <optional>
-#include <string_view>
-
 export module flate:buffer;
 import :symbols;
+import hai;
+import jute;
 
-namespace zipline {
+namespace flate {
 constexpr const auto max_repeat_jump = 32768;
 template <unsigned buf_size = max_repeat_jump * 2> class buffer {
 
-  std::array<uint8_t, buf_size> m_buf{};
+  hai::array<uint8_t> m_buf{buf_size};
   unsigned m_rd{};
   unsigned m_wr{};
 
@@ -19,7 +15,7 @@ template <unsigned buf_size = max_repeat_jump * 2> class buffer {
     return (n + d) % buf_size;
   }
   constexpr void put(uint8_t c) noexcept {
-    m_buf.at(m_wr) = c;
+    m_buf[m_wr] = c;
     m_wr = wrap(m_wr, 1);
   }
 
@@ -28,38 +24,40 @@ public:
   [[nodiscard]] constexpr uint8_t read() noexcept {
     auto p = m_rd;
     m_rd = wrap(m_rd, 1);
-    return m_buf.at(p);
+    return m_buf[p];
   }
 
-  constexpr bool operator()(symbols::raw r) noexcept {
-    put(r.c);
-    return true;
-  }
-  constexpr bool operator()(symbols::repeat r) noexcept {
-    for (unsigned i = 0; i < r.len; i++) {
-      put(m_buf.at(wrap(m_wr, -r.dist)));
+  constexpr bool visit(const symbols::symbol &r) {
+    switch (r.type) {
+    case symbols::type::raw:
+      put(r.c);
+      return true;
+    case symbols::type::repeat:
+      for (unsigned i = 0; i < r.len; i++) {
+        put(m_buf[wrap(m_wr, -r.dist)]);
+      }
+      m_rd = wrap(m_wr, -r.len);
+      return true;
+    case symbols::type::end:
+      return false;
     }
-    m_rd = wrap(m_wr, -r.len);
-    return true;
   }
-  constexpr bool operator()(symbols::end /**/) noexcept { return false; }
 };
-} // namespace zipline
+} // namespace flate
 
-using namespace zipline;
+using namespace flate;
+using namespace flate::symbols;
 
 static_assert(buffer{}.empty());
 
-static constexpr auto visit(const symbols::symbol &s) noexcept {
-  buffer b{};
-  return std::visit(b, s) ? std::optional{b} : std::nullopt;
-}
-static_assert(!visit(symbols::end{}));
-static_assert(visit(symbols::raw{'y'}));
+static constexpr const auto assert = [](auto b) {
+  if (!b)
+    throw 0;
+};
 
 template <auto N>
 static constexpr auto visit_and_read(buffer<N> &b, uint8_t c) {
-  if (!b(symbols::raw{c}))
+  if (!b.visit(symbol{type::raw, 0, 0, c}))
     return false;
   if (b.empty())
     return false;
@@ -68,9 +66,9 @@ static constexpr auto visit_and_read(buffer<N> &b, uint8_t c) {
   return b.empty();
 }
 template <auto N>
-static constexpr void visit_and_read(buffer<N> &b, std::string_view str) {
+static constexpr void visit_and_read(buffer<N> &b, jute::view str) {
   for (uint8_t c : str)
-    assert(b(symbols::raw{c}));
+    assert(b.visit(symbol{type::raw, 0, 0, c}));
 
   assert(!b.empty());
 
@@ -80,9 +78,10 @@ static constexpr void visit_and_read(buffer<N> &b, std::string_view str) {
   assert(b.empty());
 }
 template <auto N>
-static constexpr auto visit_and_read(buffer<N> &b, std::string_view str,
+static constexpr auto visit_and_read(buffer<N> &b, jute::view str,
                                      unsigned dist) {
-  if (!b(symbols::repeat{static_cast<unsigned int>(str.length()), dist}))
+  if (!b.visit(
+          symbol{type::repeat, static_cast<unsigned int>(str.size()), dist}))
     return false;
   for (uint8_t c : str) {
     if (b.empty())
