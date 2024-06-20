@@ -1,86 +1,96 @@
-module;
-#include <array>
-#include <optional>
-#include <span>
-#include <string_view>
-#include <variant>
-
 export module flate;
 import :bitstream;
 import :deflater;
+import jute;
+import traits;
 import yoyo;
 
-namespace zipline {
+using namespace traits::ints;
+
+namespace flate {
 class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
   deflater m_d;
   bool m_finished{};
 
 public:
-  constexpr explicit huffman_reader(bitstream *bits)
-      : m_bits{bits}, m_d{bits} {}
-
-  [[nodiscard]] constexpr bool eof() const override {
-    return m_d.last_block() && m_finished;
+  static constexpr mno::req<huffman_reader> create(bitstream *bits) {
+    huffman_reader res{};
+    res.m_bits = bits;
+    return deflater::from(bits).map([&](auto &d) {
+      res.m_d = traits::move(d);
+      return traits::move(res);
+    });
   }
-  [[nodiscard]] constexpr bool seekg(int /*pos*/,
-                                     yoyo::seek_mode /*mode*/) override {
-    return false;
-  }
-  [[nodiscard]] constexpr unsigned tellg() const override { return 0; }
 
-  [[nodiscard]] constexpr bool read(uint8_t *buffer, unsigned len) override {
-    for (unsigned i = 0; i < len; i++) {
-      const auto r = read_u8();
-      if (!r)
-        return false;
-      buffer[i] = *r; // NOLINT
+  [[nodiscard]] constexpr mno::req<bool> eof() const override {
+    return mno::req{m_d.last_block() && m_finished};
+  }
+  [[nodiscard]] constexpr mno::req<void>
+  seekg(int64_t /*pos*/, yoyo::seek_mode /*mode*/) override {
+    return mno::req<void>::failed("unsupported seek in huffman reader");
+  }
+  [[nodiscard]] constexpr mno::req<uint64_t> tellg() const override {
+    return mno::req<uint64_t>::failed("unsupported tellg in huffman reader");
+  }
+
+  [[nodiscard]] mno::req<unsigned> read_up_to(void *buffer,
+                                              unsigned len) override {
+    mno::req<unsigned> acc{};
+    for (unsigned i = 0; i < len && acc.is_valid(); i++) {
+      acc = read_u8().map([&](auto r) {
+        static_cast<uint8_t *>(buffer)[i] = r;
+        return i + 1;
+      });
     }
-    return true;
+    return acc;
   }
-  [[nodiscard]] bool read(void *buffer, unsigned len) override {
+  [[nodiscard]] constexpr mno::req<void> read(uint8_t *buffer,
+                                              unsigned len) override {
+    mno::req<void> acc{};
+    for (unsigned i = 0; i < len && acc.is_valid(); i++) {
+      acc = read_u8().map([&](auto r) { buffer[i] = r; });
+    }
+    return acc;
+  }
+  [[nodiscard]] mno::req<void> read(void *buffer, unsigned len) override {
     return read(static_cast<uint8_t *>(buffer), len);
   }
 
-  [[nodiscard]] constexpr std::optional<uint8_t> read_u8() override {
-    auto r = m_d.next();
-    if (r)
-      return r;
-    if (m_d.last_block()) {
-      m_finished = true;
-      return {};
-    }
-    m_d.set_next_block(m_bits);
-    return m_d.next();
+  [[nodiscard]] constexpr mno::req<uint8_t> read_u8() override {
+    return m_d.next().fmap([this](auto r) {
+      if (r)
+        return mno::req<uint8_t>{r.unwrap(0U)};
+
+      if (m_d.last_block()) {
+        m_finished = true;
+        return mno::req<uint8_t>::failed("end of deflate stream");
+      }
+
+      return m_d.set_next_block(m_bits)
+          .fmap([this] { return m_d.next(); })
+          .map([](auto r) { return r.unwrap(0U); });
+    });
   }
 
-  [[nodiscard]] constexpr std::optional<uint16_t> read_u16() override {
+  [[nodiscard]] constexpr mno::req<uint16_t> read_u16() override {
     constexpr const auto bits_per_byte = 8U;
-
-    const auto a = read_u8();
-    if (!a)
-      return {};
-    const auto b = read_u8();
-    if (!b)
-      return {};
-
-    return {(static_cast<unsigned>(*a) << bits_per_byte) | *b};
+    return mno::combine(
+        [](auto a, auto b) -> uint16_t {
+          return (static_cast<unsigned>(a) << bits_per_byte) | b;
+        },
+        read_u8(), read_u8());
   }
-  [[nodiscard]] constexpr std::optional<uint32_t> read_u32() override {
+  [[nodiscard]] constexpr mno::req<uint32_t> read_u32() override {
     constexpr const auto bits_per_word = 16U;
-
-    const auto a = read_u16();
-    if (!a)
-      return {};
-    const auto b = read_u16();
-    if (!b)
-      return {};
-
-    return {(static_cast<unsigned>(*a) << bits_per_word) | *b};
+    return mno::combine(
+        [](auto a, auto b) -> uint32_t {
+          return (static_cast<unsigned>(a) << bits_per_word) | b;
+        },
+        read_u16(), read_u16());
   }
 };
-export class deflater;
-} // namespace zipline
+} // namespace flate
 
 static_assert([]() {
   constexpr const yoyo::ce_reader ex1{
@@ -117,19 +127,22 @@ static_assert([]() {
       0x4d, 0xc3, 0xbf, 0x1e, 0x67, 0x98, 0xc3, 0x68, 0xd4, 0x23, 0x83, 0x91,
       0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
   };
-
-  using namespace zipline;
-
-  ce_bitstream b{ex1};
-  huffman_reader r{&b};
-
-  constexpr const std::string_view expected =
+  constexpr const jute::view expected =
       R"CPP(#include "m4c0/ark/zip.eocd.hpp"
 
 // End-of-central-directory has an extra comment to test the reverse)CPP";
-  std::array<uint8_t, expected.size()> res{};
-  if (!r.read(res.data(), res.size()))
-    return false;
 
-  return std::equal(res.begin(), res.end(), expected.begin());
+  uint8_t res[expected.size()]{};
+
+  ce_bitstream b{ex1};
+  return flate::huffman_reader::create(&b)
+      .fmap([&](auto &hr) { return hr.read(res, expected.size()); })
+      .map([&] {
+        const auto *ptr = res;
+        for (auto c : expected)
+          if (c != *ptr++)
+            throw 0;
+        return true;
+      })
+      .unwrap(false);
 }());
