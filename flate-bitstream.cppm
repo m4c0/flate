@@ -32,9 +32,8 @@ class bitstream {
 public:
   explicit constexpr bitstream(yoyo::reader *r) : m_reader{r} {}
 
-  constexpr void align() noexcept {
-    if (m_rem > 0)
-      auto discard = next_tiny(m_rem);
+  [[nodiscard]] constexpr auto align() noexcept {
+    return (m_rem > 0) ? next_tiny(m_rem).map([](auto) {}) : mno::req<void>{};
   }
 
   template <unsigned N>
@@ -43,13 +42,14 @@ public:
     return next_tiny(N);
   }
 
-  template <unsigned N> constexpr void skip() {
+  template <unsigned N> [[nodiscard]] constexpr auto skip() {
+    mno::req<void> res{};
     auto rem = N;
-    while (rem >= max_bits_at_once) {
-      auto r = next<max_bits_at_once>();
+    while (rem >= max_bits_at_once && res.is_valid()) {
+      res = next<max_bits_at_once>().map([](auto) {});
       rem -= max_bits_at_once;
     }
-    auto r = next<N % max_bits_at_once>();
+    return res.fmap([this] { return next<N % max_bits_at_once>(); });
   }
 
   [[nodiscard]] constexpr mno::req<unsigned> next(unsigned n) {
