@@ -1,22 +1,14 @@
-module;
-#include <array>
-#include <cassert>
-#include <optional>
-#include <span>
-
-export module flate:flater;
+export module flate:deflater;
 import :bitstream;
 import :buffer;
 import :details;
 import :symbols;
+import traits;
 import yoyo;
 
-namespace zipline {
-struct unsupported_huffman_encoding : std::runtime_error {
-  unsupported_huffman_encoding()
-      : runtime_error("Unsupported deflate algorithm") {}
-};
+using namespace traits::ints;
 
+namespace flate {
 class deflater {
   bitstream *m_bits{};
   tables::huff_tables m_tables{};
@@ -25,63 +17,84 @@ class deflater {
   bool m_last_block{};
   bool m_uncompressed{};
 
+  [[nodiscard]] constexpr mno::req<void> read_huff0_len() {
+    return m_bits->align()
+        .fmap([this] { return m_bits->next<8>() + (m_bits->next<8>() << 8); })
+        .map([this](auto len) { m_len = len; })
+        .fmap([this] {
+          return m_bits->skip<16>(); // NLEN
+        });
+  }
+  [[nodiscard]] constexpr mno::req<void> read_huff2_tables() {
+    return details::read_hc_format(m_bits).fmap([this](auto &fmt) {
+      return details::read_hclens(m_bits, fmt).fmap([&](auto &lens) {
+        return details::read_hlit_hdist(fmt, lens, m_bits)
+            .map([&](auto &hlit_hdist) {
+              m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
+            });
+      });
+    });
+  }
+
 public:
   explicit constexpr deflater() = default;
-  explicit constexpr deflater(bitstream *first_block) {
-    set_next_block(first_block);
-  }
 
-  constexpr void set_next_block(bitstream *b) {
+  [[nodiscard]] constexpr mno::req<void> set_next_block(bitstream *b) {
     m_bits = b;
 
-    m_last_block = m_bits->next<1>() == 1;
-    switch (m_bits->next<2>()) {
-    case 0:
-      m_bits->align();
-      m_len = m_bits->next<8>() + (m_bits->next<8>() << 8);
-      m_bits->skip<16>(); // NLEN
-      m_uncompressed = true;
-      break;
-    case 1:
-      m_tables = tables::create_fixed_huffman_table();
-      m_uncompressed = false;
-      break;
-    case 2: {
-      auto fmt = details::read_hc_format(m_bits);
-      auto lens = details::read_hclens(m_bits, fmt);
-      auto hlit_hdist = details::read_hlit_hdist(fmt, lens, m_bits);
-      m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
-      m_uncompressed = false;
-      break;
-    }
-    default:
-      throw unsupported_huffman_encoding();
-    }
+    return m_bits->next<1>()
+        .map([this](auto b) { m_last_block = b == 1; })
+        .fmap([this] { return m_bits->next<2>(); })
+        .fmap([this](auto b) -> mno::req<void> {
+          switch (b) {
+          case 0:
+            m_uncompressed = true;
+            return read_huff0_len();
+          case 1:
+            m_uncompressed = false;
+            m_tables = tables::create_fixed_huffman_table();
+            return {};
+          case 2: {
+            m_uncompressed = false;
+            return read_huff2_tables();
+          }
+          default:
+            return mno::req<void>::failed("unsupported huffman encoding");
+          }
+        });
   }
 
-  [[nodiscard]] constexpr std::optional<uint8_t> next() {
+  [[nodiscard]] constexpr mno::req<mno::opt<uint8_t>> next() {
     assert(m_bits != nullptr);
     if (m_uncompressed) {
       if (m_len == 0) {
         return {};
       }
       m_len--;
-      return m_bits->next<8>();
+      return m_bits->next<8>().map([](uint8_t n) { return mno::opt{n}; });
     }
     if (m_buffer.empty()) {
-      auto sym = symbols::read_next_symbol(m_tables, m_bits);
-      if (!std::visit(m_buffer, sym)) {
-        m_bits = nullptr;
-        return {};
-      }
+      return symbols::read_next_symbol(m_tables, m_bits)
+          .map([this](auto sym) -> mno::opt<uint8_t> {
+            if (!m_buffer.visit(sym)) {
+              m_bits = nullptr;
+              return {};
+            }
+            return mno::opt<uint8_t>{m_buffer.read()};
+          });
     }
-    return {m_buffer.read()};
+    return mno::req{mno::opt<uint8_t>{m_buffer.read()}};
   }
   [[nodiscard]] constexpr auto last_block() const noexcept {
     return m_last_block;
   }
+
+  [[nodiscard]] static constexpr auto from(bitstream *first_block) {
+    deflater d{};
+    return d.set_next_block(first_block).map([&] { return traits::move(d); });
+  }
 };
-} // namespace zipline
+} // namespace flate
 
 constexpr const yoyo::ce_reader real_zip_block_example{
     0x8d, 0x52, 0x4d, 0x6b, 0x83, 0x40, 0x10, 0xbd, 0xfb, 0x2b, 0x06, 0x0b,
@@ -118,10 +131,13 @@ constexpr const yoyo::ce_reader real_zip_block_example{
     0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
 };
 static_assert([] {
-  zipline::deflater d{};
   ce_bitstream b{real_zip_block_example};
-  d.set_next_block(&b);
-  return d.next() == '#' && d.next() == 'i' && d.next() == 'n';
+  return flate::deflater::from(&b)
+      .assert([](auto &d) { return d.next() == '#'; }, "#")
+      .assert([](auto &d) { return d.next() == 'i'; }, "i")
+      .assert([](auto &d) { return d.next() == 'n'; }, "n")
+      .map([](auto &) { return true; })
+      .unwrap(false);
 }());
 static_assert([] {
   ce_bitstream b{yoyo::ce_reader{
@@ -130,32 +146,39 @@ static_assert([] {
       0, 0,  // NLEN
       93, 15 // DATA
   }};
-  zipline::deflater d{&b};
-  return d.next() == 93 && d.next() == 15 && !d.next();
+  return flate::deflater::from(&b)
+      .assert([](auto &d) { return d.next() == 93; }, "93")
+      .assert([](auto &d) { return d.next() == 15; }, "15")
+      .fmap([](auto &d) { return d.next(); })
+      .map([](auto b) { return !b; })
+      .unwrap(false);
 }());
 static_assert([] {
+  static constexpr const auto has_ended = [](auto &d) {
+    return d.next().map([](auto n) { return !n; }).unwrap(false);
+  };
+
   // Tests with fixed huffman table
   // H = 00110000 + 01001000 = 01111000
   ce_bitstream b1{yoyo::ce_reader{0b11110011, 0, 0}};
-  zipline::deflater d{&b1};
-  assert(d.next() == 'H');
-  assert(!d.next());
-
   // E = 00110000 + 01000101 = 01110101
   // Y = 00110000 + 01011001 = 10001001
   ce_bitstream b2{yoyo::ce_reader{0b01110011, 0b10001101, 0b100, 0}};
-  d.set_next_block(&b2);
-  assert(d.next() == 'E');
-  assert(d.next() == 'Y');
-  assert(!d.next());
-
   // repeat{3, 3} = {257, 2} = {0000001, 00010}
   ce_bitstream b3{yoyo::ce_reader{0b00000011, 0b0100010, 0}};
-  d.set_next_block(&b3);
-  assert(d.next() == 'H');
-  assert(d.next() == 'E');
-  assert(d.next() == 'Y');
-  assert(!d.next());
 
-  return true;
+  return flate::deflater::from(&b1)
+      .assert([](auto &d) { return d.next() == 'H'; }, "H")
+      .assert(has_ended, "")
+      .fpeek([&](auto &d) { return d.set_next_block(&b2); })
+      .assert([](auto &d) { return d.next() == 'E'; }, "E")
+      .assert([](auto &d) { return d.next() == 'Y'; }, "Y")
+      .assert(has_ended, "")
+      .fpeek([&](auto &d) { return d.set_next_block(&b3); })
+      .assert([](auto &d) { return d.next() == 'H'; }, "H")
+      .assert([](auto &d) { return d.next() == 'E'; }, "E")
+      .assert([](auto &d) { return d.next() == 'Y'; }, "Y")
+      .assert(has_ended, "")
+      .map([](auto &) { return true; })
+      .unwrap(false);
 }());

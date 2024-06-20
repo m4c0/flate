@@ -92,7 +92,7 @@ static_assert([] {
   return true;
 }());
 
-constexpr auto create_fixed_huffman_table() {
+[[nodiscard]] constexpr auto create_fixed_huffman_table() {
   hai::array<unsigned> fixed_hlist{288};
   for (auto i = 0; i < 144; i++)
     fixed_hlist[i] = 8;
