@@ -42,14 +42,15 @@ public:
     return next_tiny(N);
   }
 
-  template <unsigned N> [[nodiscard]] constexpr auto skip() {
-    mno::req<void> res{};
+  template <unsigned N> [[nodiscard]] constexpr mno::req<void> skip() {
+    mno::req<unsigned> res{};
     auto rem = N;
     while (rem >= max_bits_at_once && res.is_valid()) {
-      res = next<max_bits_at_once>().map([](auto) {});
+      res = next<max_bits_at_once>();
       rem -= max_bits_at_once;
     }
-    return res.fmap([this] { return next<N % max_bits_at_once>(); });
+    return res.fmap([this](auto) { return next<N % max_bits_at_once>(); })
+        .map([](auto) {});
   }
 
   [[nodiscard]] constexpr mno::req<unsigned> next(unsigned n) {
@@ -112,8 +113,7 @@ static_assert([] {
 static_assert([] {
   auto r = data;
   bitstream b{&r};
-  b.skip<0>();
-  return b.next<1>() == 1;
+  return b.skip<0>().map([&] { return b.next<1>() == 1; }).unwrap(false);
 }());
 // Skip nothing from somewhere
 static_assert([] {
@@ -121,22 +121,21 @@ static_assert([] {
   bitstream b{&r};
   if (b.next<1>() != 1)
     return false;
-  b.skip<2>();
-  return b.next<5>() == 17; // NOLINT
+  return b.skip<2>().map([&] { return b.next<5>() == 17; }).unwrap(false);
 }());
 // Skip from beginning
 static_assert([] {
   auto r = data;
   bitstream b{&r};
-  b.skip<3>();
-  return b.next<5>() == 17; // NOLINT
+  return b.skip<3>().map([&] { return b.next<5>() == 17; }).unwrap(false);
 }());
 static_assert([] {
   constexpr const auto bits_to_skip = 1 + 2 + 5 + 5 + 4;
   auto r = data;
   bitstream b{&r};
-  b.skip<bits_to_skip>();
-  return b.next<3>() == 6 && b.next<3>() == 4; // NOLINT
+  return b.skip<bits_to_skip>()
+      .map([&] { return b.next<3>() == 6 && b.next<3>() == 4; })
+      .unwrap(false);
 }());
 static_assert([] {
   auto r = data;
@@ -147,21 +146,24 @@ static_assert([] {
   constexpr const yoyo::ce_reader data{0xA0, 0x5A, 0x05};
   auto r = data;
   bitstream b{&r};
-  b.skip<4>();
-  return b.next(8) == 0xAA && b.next(8) == 0x55;
+  return b.skip<4>()
+      .map([&] { return b.next(8) == 0xAA && b.next(8) == 0x55; })
+      .unwrap(false);
 }());
 static_assert([] {
   constexpr const yoyo::ce_reader data{0x40, 0x23, 0x01};
   auto r = data;
   bitstream b{&r};
-  b.skip<4>();
-  return b.next(16) == 0x1234;
+  return b.skip<4>().map([&] { return b.next(16) == 0x1234; }).unwrap(false);
 }());
 static_assert([] {
   auto r = data;
   bitstream b{&r};
-  b.skip<4>();
-  b.align();
-  b.align(); // Should NOT skip another byte
-  return b.next<8>() == 0x52;
+  return b.skip<4>()
+      .fmap([&] { return b.align(); })
+      .fmap([&] {
+        return b.align(); // Should NOT skip another byte
+      })
+      .map([&] { return b.next<8>() == 0x52; })
+      .unwrap(false);
 }());
