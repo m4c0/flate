@@ -1,16 +1,10 @@
-module;
-#include <algorithm>
-#include <array>
-#include <exception>
-#include <optional>
-
 export module flate:details;
 import :bitstream;
 import :huffman;
-import containers;
+import hai;
 import yoyo;
 
-namespace zipline::details {
+namespace flate::details {
 // Magic constants gallore - it should follow this RFC:
 // https://datatracker.ietf.org/doc/html/rfc1951
 // Note: PKZIP's "APPNOTE" does not match these
@@ -27,9 +21,8 @@ static constexpr const auto hlit_max = 286;
 static constexpr const auto hdist_max = 32;
 
 static constexpr const auto max_code_lengths = 19;
-static constexpr const auto hclen_order = std::array{
+static constexpr const unsigned hclen_order[max_code_lengths] = {
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
-static_assert(hclen_order.size() == max_code_lengths);
 
 static constexpr const auto hclen_bits = 3U;
 
@@ -41,19 +34,24 @@ struct dynamic_huffman_format {
 
 [[nodiscard]] static constexpr auto read_hc_format(bitstream *bits) {
   dynamic_huffman_format res{};
-  res.hlit = bits->next<hlit_count_bits>() + hlit_min;
-  res.hdist = bits->next<hdist_count_bits>() + hdist_min;
-  res.hclen = bits->next<hclen_count_bits>() + hclen_min;
-  return res;
+  return bits->next<hlit_count_bits>()
+      .map([&](auto hlit) { res.hlit = hlit + hlit_min; })
+      .fmap([&] { return bits->next<hdist_count_bits>(); })
+      .map([&](auto hdist) { res.hdist = hdist + hdist_min; })
+      .fmap([&] { return bits->next<hclen_count_bits>(); })
+      .map([&](auto hclen) { res.hclen = hclen + hclen_min; })
+      .map([&] { return res; });
 }
 
 [[nodiscard]] static constexpr auto
 read_hclens(bitstream *bits, const dynamic_huffman_format &fmt) {
-  std::array<unsigned, max_code_lengths> res{};
-  for (int i = 0; i < fmt.hclen; i++) {
-    res.at(hclen_order.at(i)) = bits->next<hclen_bits>();
+  hai::array<unsigned> buffer{max_code_lengths};
+  mno::req<void> res{};
+  for (int i = 0; i < fmt.hclen && res.is_valid(); i++) {
+    res = bits->next<hclen_bits>().map(
+        [&](auto b) { buffer[hclen_order[i]] = b; });
   }
-  return res;
+  return res.map([&] { return traits::move(buffer); });
 }
 
 constexpr const auto copy_previous = 16;
@@ -75,38 +73,38 @@ constexpr const auto repeat_zero_11_138 = 18;
                                                  bitstream *bits) {
   switch (code) {
   case copy_previous:
-    return 3U + bits->next<2>();
+    return bits->next<2>() + mno::req{3U};
   case repeat_zero_3_10:
-    return 3U + bits->next<3>();
+    return bits->next<3>() + mno::req{3U};
   case repeat_zero_11_138:
-    return 11U + bits->next<7>(); // NOLINT;
+    return bits->next<7>() + mno::req{11U}; // NOLINT;
   default:
-    return 1U;
+    return mno::req{1U};
   }
 }
 [[nodiscard]] static constexpr auto
 read_hlit_hdist(const dynamic_huffman_format &fmt,
-                const std::array<unsigned, max_code_lengths> &hclens,
-                bitstream *bits) {
-  containers::unique_array<unsigned> result{fmt.hlit + fmt.hdist};
+                const hai::array<unsigned> &hclens, bitstream *bits) {
+  hai::array<unsigned> result{fmt.hlit + fmt.hdist};
 
-  auto huff = create_huffman_codes(hclens);
+  auto huff = create_huffman_codes(hclens.begin(), hclens.size());
   auto previous = 0U;
   auto *it = result.begin();
-  while (it != result.end()) {
-    auto code = decode_huffman(huff, bits);
-    auto to_repeat = code_to_repeat(code, previous);
-    auto count = repeat_count(code, bits);
-    for (int j = 0; j < count; j++) {
-      *it++ =
-          to_repeat; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    }
-    previous = to_repeat;
+  mno::req<void> res{};
+  while (it != result.end() && res.is_valid()) {
+    res = decode_huffman(huff, bits).fmap([&](auto code) {
+      auto to_repeat = code_to_repeat(code, previous);
+      return repeat_count(code, bits).map([&](auto count) {
+        for (int j = 0; j < count; j++) {
+          *it++ = to_repeat;
+        }
+        previous = to_repeat;
+      });
+    });
   }
-
-  return result;
+  return res.map([&] { return traits::move(result); });
 }
-} // namespace zipline::details
+} // namespace flate::details
 
 static constexpr const yoyo::ce_reader ex1{
     0x8d, 0x52, 0x4d, 0x6b, 0x83, 0x40, 0x10, 0xbd, 0xfb, 0x2b, 0x06, 0x0b,
@@ -143,49 +141,45 @@ static constexpr const yoyo::ce_reader ex1{
     0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
 };
 
-using namespace zipline;
-using namespace zipline::details;
-
-static constexpr const auto fmt_offset = 3; // last block + dynamic
-static constexpr const auto fmt = [] {
-  ce_bitstream b{ex1};
-  b.skip<fmt_offset>();
-  return read_hc_format(&b);
-}();
-static constexpr const auto expected_hlit = 274;
-static_assert(fmt.hlit == expected_hlit);
-static constexpr const auto expected_hdist = 19;
-static_assert(fmt.hdist == expected_hdist);
-static constexpr const auto expected_hclen = 14;
-static_assert(fmt.hclen == expected_hclen);
-
-static constexpr const auto hclens_offset =
-    fmt_offset + hlit_count_bits + hdist_count_bits + hclen_count_bits;
-static constexpr const auto hclens = [] {
-  ce_bitstream b{ex1};
-  b.skip<hclens_offset>();
-  return read_hclens(&b, fmt);
-}();
-constexpr const std::array<unsigned, 19> expected_hclens{
-    2, 0, 0, 5, 4, 4, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 6, 4, 6};
-static_assert(hclens == expected_hclens);
+using namespace flate;
+using namespace flate::details;
 
 static_assert([] {
-  ce_bitstream bits{ex1};
-  bits.skip<hclens_offset + expected_hclen * 3>();
+  constexpr const auto fail = [] -> bool { throw 0; };
+  constexpr const auto fail_ = [](auto) { throw 0; };
 
-  const auto res = read_hlit_hdist(fmt, expected_hclens, &bits);
-  if (res.at(0) != 0)
-    return false;
-  if (res.at(9) != 0)
-    return false; // NOLINT
-  if (res.at(10) != 6)
-    return false; // NOLINT
-  if (res.at(32) != 4)
-    return false; // NOLINT
-  if (res.at(58) != 6)
-    return false; // NOLINT
-  if (res.at(274 + 18) != 6)
-    return false; // NOLINT
-  return true;
+  ce_bitstream b{ex1};
+
+  auto fmt = b.skip<3>() // last block + dynamic
+                 .fmap([&] { return read_hc_format(&b); })
+                 .take(fail_);
+  (fmt.hlit == 274) || fail();
+  (fmt.hdist == 19) || fail();
+  (fmt.hclen == 14) || fail();
+
+  auto hclens = read_hclens(&b, fmt).take([](auto) { throw 0; });
+  const unsigned exp_hclens[19]{2, 0, 0, 5, 4, 4, 2, 3, 3, 0,
+                                0, 0, 0, 0, 0, 0, 6, 4, 6};
+  for (auto i = 0; i < 19; i++) {
+    if (hclens[i] != exp_hclens[i])
+      throw 0;
+  }
+
+  return read_hlit_hdist(fmt, hclens, &b)
+      .map([](auto &res) {
+        if (res[0] != 0)
+          return false;
+        if (res[9] != 0)
+          return false; // NOLINT
+        if (res[10] != 6)
+          return false; // NOLINT
+        if (res[32] != 4)
+          return false; // NOLINT
+        if (res[58] != 6)
+          return false; // NOLINT
+        if (res[274 + 18] != 6)
+          return false; // NOLINT
+        return true;
+      })
+      .take(fail_);
 }());
