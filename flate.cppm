@@ -1,6 +1,6 @@
 export module flate;
-import :bitstream;
-import :deflater;
+export import :bitstream;
+export import :deflater;
 import jute;
 import traits;
 import yoyo;
@@ -8,7 +8,7 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
-class huffman_reader : public yoyo::reader {
+export class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
   deflater m_d;
   bool m_finished{};

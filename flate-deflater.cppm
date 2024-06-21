@@ -9,7 +9,7 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
-class deflater {
+export class deflater {
   bitstream *m_bits{};
   tables::huff_tables m_tables{};
   buffer<> m_buffer{};

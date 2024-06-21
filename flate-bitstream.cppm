@@ -1,8 +1,8 @@
 export module flate:bitstream;
 import yoyo;
 
-export namespace flate {
-class bitstream {
+namespace flate {
+export class bitstream {
   static constexpr const auto max_bits_at_once = 8;
   static constexpr const auto bits_per_byte = 8U;
 
