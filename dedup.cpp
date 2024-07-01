@@ -52,12 +52,13 @@ static_assert([] {
   assert_next({type::raw, 0, 0, 'E'});
   assert_next({type::raw, 0, 0, 'Y'});
   assert_next({type::repeat, 6, 3});
-  // assert_next({type::end});
   assert_next({type::raw, 0, 0, ' '});
   assert_next({type::raw, 0, 0, 'Y'});
   assert_next({type::raw, 0, 0, 'O'});
   assert_next({type::raw, 0, 0, 'Y'});
   assert_next({type::raw, 0, 0, 'O'});
   assert_next({type::repeat, 3, 5});
+  assert_next({type::raw, 0, 0, '\0'});
+  assert_next({type::end});
   return true;
 }());
