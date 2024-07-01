@@ -15,7 +15,7 @@ constexpr symbols::symbol dedup(const uint8_t *data, int len, int &ptr) {
       continue;
 
     int j{};
-    for (j = 1; ptr + j < len; j++) {
+    for (; ptr + j < len; j++) {
       if (data[i + j] != data[ptr + j])
         break;
     }
@@ -26,14 +26,14 @@ constexpr symbols::symbol dedup(const uint8_t *data, int len, int &ptr) {
   if (l_len <= 1)
     return {type::raw, 0, 0, data[ptr++]};
 
-  ptr += l_len - l_dist;
+  ptr += l_len;
   return {type::repeat, static_cast<unsigned>(l_len),
           static_cast<unsigned>(l_dist)};
 }
 } // namespace flate
 
 static_assert([] {
-  constexpr const uint8_t data[]{"HEYHEYHEY YO YO YO"};
+  constexpr const uint8_t data[]{"HEYHEYHEY YOYO YO"};
 
   int ptr{};
   const auto assert_next = [&](symbol expected) {
@@ -52,7 +52,12 @@ static_assert([] {
   assert_next({type::raw, 0, 0, 'E'});
   assert_next({type::raw, 0, 0, 'Y'});
   assert_next({type::repeat, 6, 3});
-
   // assert_next({type::end});
+  assert_next({type::raw, 0, 0, ' '});
+  assert_next({type::raw, 0, 0, 'Y'});
+  assert_next({type::raw, 0, 0, 'O'});
+  assert_next({type::raw, 0, 0, 'Y'});
+  assert_next({type::raw, 0, 0, 'O'});
+  assert_next({type::repeat, 3, 5});
   return true;
 }());
