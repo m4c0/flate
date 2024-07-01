@@ -1,3 +1,4 @@
+#pragma leco add_impl dedup
 export module flate;
 export import :bitstream;
 export import :deflater;
