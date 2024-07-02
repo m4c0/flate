@@ -40,7 +40,12 @@ public:
       return true;
     case symbols::type::end:
       return false;
+    case symbols::type::nil:
+      // should never happen
+      break;
     }
+
+    throw 0;
   }
 };
 } // namespace flate

@@ -9,7 +9,7 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate::symbols {
-enum class type { end, raw, repeat };
+enum class type { nil, end, raw, repeat };
 struct symbol {
   type type;
   unsigned len{};
