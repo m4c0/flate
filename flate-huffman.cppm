@@ -82,7 +82,8 @@ static constexpr auto max(const unsigned *lens, unsigned max_codes) {
 
 using namespace flate;
 
-static constexpr bool operator==(const auto &a, const auto &b) noexcept {
+static constexpr bool operator==(const uint_array &a,
+                                 const uint_array &b) noexcept {
   if (a.size() != b.size())
     return false;
   for (auto i = 0; i < a.size(); i++) {
