@@ -70,7 +70,7 @@ constexpr void static_huffman_encode(const hai::array<symbol> &syms,
       break;
     case type::end:
       write_static_huffman(256, w);
-      break;
+      return;
     case type::nil:
       silog::fail("unexpected symbol found on compression");
       break;
