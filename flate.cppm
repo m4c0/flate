@@ -11,6 +11,9 @@ using namespace traits::ints;
 namespace flate {
 export mno::req<void> compress(yoyo::writer &w, const void *data,
                                unsigned size);
+export constexpr auto compress(const void *data, unsigned size) {
+  return [=](auto &w) { return compress(w, data, size); };
+}
 
 export class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
