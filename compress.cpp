@@ -5,8 +5,8 @@ import hai;
 static constexpr auto compress(yoyo::writer &w, const uint8_t *data,
                                unsigned size) {
   bitwriter bitw{size};
-  bitw.write(1, 1);
-  bitw.write(1, 2);
+  bitw.write(1, 1); // Final block
+  bitw.write(1, 2); // Static Huffman tables
 
   auto syms = dedup_all(data, size);
   static_huffman_encode(syms, bitw);
