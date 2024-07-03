@@ -9,9 +9,9 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
-export mno::req<void> compress(yoyo::writer &w, const void *data,
-                               unsigned size);
-export constexpr auto compress(const void *data, unsigned size) {
+export [[nodiscard]] mno::req<void> compress(yoyo::writer &w, const void *data,
+                                             unsigned size);
+export [[nodiscard]] constexpr auto compress(const void *data, unsigned size) {
   return [=](auto &w) { return compress(w, data, size); };
 }
 
