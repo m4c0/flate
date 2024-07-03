@@ -94,16 +94,13 @@ static_assert([] {
 
 static_assert([] {
   constexpr const uint8_t data[]{"HEYHEY"};
-  constexpr const symbols::symbol exp[]{
-      {type::raw, 0, 0, 'H'}, {type::raw, 0, 0, 'E'},  {type::raw, 0, 0, 'Y'},
-      {type::repeat, 3, 3},   {type::raw, 0, 0, '\0'}, {type::end}};
 
   auto res = dedup_all(data, sizeof(data));
-  assert_symbol(res[0], exp[0]);
-  assert_symbol(res[1], exp[1]);
-  assert_symbol(res[2], exp[2]);
-  assert_symbol(res[3], exp[3]);
-  assert_symbol(res[4], exp[4]);
-  assert_symbol(res[5], exp[5]);
+  assert_symbol(res[0], {type::raw, 0, 0, 'H'});
+  assert_symbol(res[1], {type::raw, 0, 0, 'E'});
+  assert_symbol(res[2], {type::raw, 0, 0, 'Y'});
+  assert_symbol(res[3], {type::repeat, 3, 3});
+  assert_symbol(res[4], {type::raw, 0, 0, '\0'});
+  assert_symbol(res[5], {type::end});
   return true;
 }());
