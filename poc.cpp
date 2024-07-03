@@ -42,5 +42,8 @@ int main() {
       })
       .map([](auto n) { silog::log(silog::info, "Got %d bytes back", n); })
       .map([] { return 0; })
-      .log_error([] { return 1; });
+      .log_error([&] {
+        silog::log(silog::info, "Total of %d bytes read", rd.raw_pos());
+        return 1;
+      });
 }
