@@ -37,7 +37,7 @@ constexpr symbols::symbol dedup(const uint8_t *data, int len, int &ptr) {
 }
 
 constexpr hai::varray<symbols::symbol> dedup_all(const uint8_t *data, int len) {
-  hai::varray<symbols::symbol> res{static_cast<unsigned>(len)};
+  hai::varray<symbols::symbol> res{static_cast<unsigned>(len + 1)};
   int ptr = 0;
   do {
     res.push_back(dedup(data, len, ptr));
