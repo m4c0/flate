@@ -8,6 +8,7 @@ import yoyo;
 
 using namespace traits::ints;
 
+#if 0
 constexpr const uint8_t lorem_ipsum[] = R"(
 Ut et praesentium perspiciatis hic. Doloribus ut architecto non et eligendi. Hic aliquid ea corporis.
 
@@ -19,6 +20,22 @@ Numquam iste est consequatur optio voluptatibus nihil. Tenetur non ipsa id. Quia
 
 Illum voluptatibus aut esse. Omnis asperiores praesentium quo voluptas quia quidem ut dolores. Ut quod nihil illo consequatur aut.
 )";
+#else
+// Brainf**k quine, should compress more
+constexpr const uint8_t lorem_ipsum[] =
+    "->+>+++>>+>++>+>+++>>+>++>>>+>+>+>++>+>>>>+++>+>>++>+>+++>>++>++>>+>>+>++>"
+    "++>+>>>>+++>+>>>>++>++>>>>+>>++>+>+++>>>++>>++++++>>+>>++>+>>>>+++>>+++++>"
+    ">+>+++>>>++>>++>>+>>++>+>+++>>>++>>+++++++++++++>>+>>++>+>+++>+>+++>>>++>>"
+    "++++>>+>>++>+>>>>+++>>+++++>>>>++>>>>+>+>++>>+++>+>>>>+++>+>>>>+++>+>>>>++"
+    "+>>++>++>+>+++>+>++>++>>>>>>++>+>+++>>>>>+++>>>++>+>+++>+>+>++>>>>>>++>>>+"
+    ">>>++>+>>>>+++>+>>>+>>++>+>++++++++++++++++++>>>>+>+>>>+>>++>+>+++>>>++>>+"
+    "+++++++>>+>>++>+>>>>+++>>++++++>>>+>++>>+++>+>+>++>+>+++>>>>>+++>>>+>+>>++"
+    ">+>+++>>>++>>++++++++>>+>>++>+>>>>+++>>++++>>+>+++>>>>>>++>+>+++>>+>++>>>>"
+    "+>+>++>+>>>>+++>>+++>>>+[[->>+<<]<+]+++++[->+++++++++<]>.[+]>>[<<+++++++[-"
+    ">+++++++++<]>-.------------------->-[-<.<+>>]<[+]<+>>>]<<<[-[-[-[>>+<+++++"
+    "+[->+++++<]]>++++++++++++++<]>+++<]++++++[->+++++++<]>+<<<-[->>>++<<<]>[->"
+    ">.<<]<<]";
+#endif
 
 int main() {
   silog::log(silog::info, "Original string has %d bytes",
