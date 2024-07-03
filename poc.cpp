@@ -21,6 +21,9 @@ Illum voluptatibus aut esse. Omnis asperiores praesentium quo voluptas quia quid
 )";
 
 int main() {
+  silog::log(silog::info, "Original string has %d bytes",
+             static_cast<int>(sizeof(lorem_ipsum)));
+
   hai::array<uint8_t> comp{10240};
   yoyo::memwriter wr{comp};
   yoyo::memreader rd{comp.begin(), comp.size()};
