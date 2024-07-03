@@ -11,13 +11,13 @@ constexpr bool operator==(const bit_pair &s, const bit_pair &r) {
   return s.bits == r.bits && s.second == r.second;
 }
 
+constexpr const auto min_lens_code = 257U;
 constexpr const auto max_lens_code = 285U;
 struct bit_pairs {
   bit_pair data[max_lens_code + 1];
 };
 constexpr const auto bitlens = [] {
   constexpr const auto first_parametric_code = 261U;
-  constexpr const auto min_lens_code = 257U;
 
   bit_pairs res{};
   for (auto i = min_lens_code; i < first_parametric_code; i++) {
