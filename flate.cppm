@@ -1,4 +1,4 @@
-#pragma leco add_impl dedup
+#pragma leco add_impl compress
 export module flate;
 export import :bitstream;
 export import :deflater;
@@ -9,6 +9,9 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
+export mno::req<void> compress(yoyo::writer &w, const void *data,
+                               unsigned size);
+
 export class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
   deflater m_d;

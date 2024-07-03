@@ -1,4 +1,5 @@
-module flate;
+export module flate:dedup;
+import :namffuh;
 import hai;
 
 namespace flate {
