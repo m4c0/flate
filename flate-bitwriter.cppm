@@ -29,6 +29,24 @@ public:
       m_acc >>= 8;
     }
   }
+  constexpr void write_be(unsigned data, unsigned bit_count) {
+    if (bit_count > 16)
+      silog::fail("attempt of writing more than 16 bits at once");
+
+    auto mask = 1 << (bit_count - 1);
+    for (auto i = 0; i < bit_count; i++) {
+      if ((data & mask) != 0) {
+        m_acc |= 1 << m_bits;
+      }
+      m_bits++;
+      mask >>= 1;
+      if (m_bits >= 8) {
+        m_buffer.push_back(m_acc);
+        m_bits -= 8;
+        m_acc >>= 8;
+      }
+    }
+  }
 
   constexpr void flush() {
     if (m_bits == 0)
@@ -56,5 +74,21 @@ static_assert([] {
   // 0001.1010 1101.0101
   assert(b.buffer()[0], 0xD5u);
   assert(b.buffer()[1], 0x1Au);
+  return true;
+}());
+static_assert([] {
+  constexpr const auto assert = [](auto res, auto exp) {
+    if (res != exp)
+      throw 0;
+  };
+
+  flate::bitwriter b{2};
+  b.write_be(1, 1);
+  b.write_be(2, 2);
+  b.write_be(0x55, 8);
+  b.write_be(3, 2);
+  b.flush();
+  assert(b.buffer()[0], 0b01010011u);
+  assert(b.buffer()[1], 0b00011101u);
   return true;
 }());

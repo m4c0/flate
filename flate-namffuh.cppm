@@ -25,7 +25,7 @@ static constexpr auto static_huffman_bits(unsigned lit) {
   return 8;
 }
 static constexpr void write_static_huffman(unsigned lit, bitwriter &w) {
-  w.write(static_huffman_code(lit), static_huffman_bits(lit));
+  w.write_be(static_huffman_code(lit), static_huffman_bits(lit));
 }
 
 static constexpr void write_huffman_len(unsigned len, bitwriter &w) {
@@ -88,20 +88,21 @@ static_assert([] {
   };
 
   hai::array<symbol> syms{4};
-  syms[0] = {type::raw, 0, 0, 0x5A};
-  syms[1] = {type::raw, 0, 0, 0xA5};
-  syms[2] = {type::repeat, 6, 2}; // 260, 2
+  syms[0] = {type::raw, 0, 0, 0x5A}; // 10001010
+  syms[1] = {type::raw, 0, 0, 0xA5}; // 110100101
+  syms[2] = {type::repeat, 6, 2};    // 260, 2 - 0000100 00001
   syms[3] = {type::end};
 
   bitwriter w{16};
   static_huffman_encode(syms, w);
   w.flush();
 
-  assert(w.buffer()[0], 0b10001010);
-  assert(w.buffer()[1], 0b10100101);
-  assert(w.buffer()[2], 0b00001001);
+  assert(w.buffer()[0], 0b01010001);
+  assert(w.buffer()[1], 0b01001011);
+  assert(w.buffer()[2], 0b00100001);
   assert(w.buffer()[3], 0b00000001);
-  assert(w.buffer()[4], 0b0000000);
+  assert(w.buffer()[4], 0b00000000);
+  assert(w.buffer().size(), 5);
 
   // TODO: test len with extra bits
   // TODO: test dist with extra bits

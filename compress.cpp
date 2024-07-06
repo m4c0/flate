@@ -21,6 +21,8 @@ static constexpr auto compress(yoyo::writer &w, const uint8_t *data,
 }
 
 static_assert([] {
+  // TODO: test extra bits
+
   constexpr const uint8_t data[]{"HUEHUEHUEHUE"};
   // H(72),   U(85),   E(69),   rep(9,3)[263], 0,       end
   // 01111000 10000101 01110101 0000111 00010  00110000 0000000
@@ -35,12 +37,12 @@ static_assert([] {
     if (res != exp)
       throw 0;
   };
-  assert(buf[0], 0b11000011);
-  assert(buf[1], 0b00101011);
-  assert(buf[2], 0b10101100);
-  assert(buf[3], 0b00111011);
-  assert(buf[4], 0b00001000);
-  assert(buf[5], 0b00011000);
+  assert(buf[0], 0b11110011);
+  assert(buf[1], 0b00001000);
+  assert(buf[2], 0b01110101);
+  assert(buf[3], 0b10000101);
+  assert(buf[4], 0b00001011);
+  assert(buf[5], 0b00000110);
   assert(buf[6], 0b00000000);
   assert(w.raw_pos(), 7);
   return true;
