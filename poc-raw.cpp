@@ -22,7 +22,7 @@ static auto create_file() {
 int main() {
   return create_file()
       .map([] {
-        return system("out" SEP HOST_TARGET SEP "infgen.exe out" SEP
+        return system("out" SEP HOST_TARGET SEP "infgen.exe -d -d out" SEP
                       "test.def");
       })
       .log_error([] { return 1; });
