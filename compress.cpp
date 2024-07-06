@@ -41,7 +41,7 @@ static_assert([] {
   assert(buf[1], 0b00001000);
   assert(buf[2], 0b01110101);
   assert(buf[3], 0b10000101);
-  assert(buf[4], 0b00001011);
+  assert(buf[4], 0b00100011);
   assert(buf[5], 0b00000110);
   assert(buf[6], 0b00000000);
   assert(w.raw_pos(), 7);

@@ -49,7 +49,7 @@ static constexpr void write_huffman_dist(unsigned dist, bitwriter &w) {
     if (dist >= min + (1 << bits))
       continue;
 
-    w.write(code, 5);
+    w.write_be(code, 5);
     if (bits > 0)
       w.write(dist - min, bits);
     return;
@@ -100,7 +100,7 @@ static_assert([] {
   assert(w.buffer()[0], 0b01010001);
   assert(w.buffer()[1], 0b01001011);
   assert(w.buffer()[2], 0b00100001);
-  assert(w.buffer()[3], 0b00000001);
+  assert(w.buffer()[3], 0b00010000);
   assert(w.buffer()[4], 0b00000000);
   assert(w.buffer().size(), 5);
 
