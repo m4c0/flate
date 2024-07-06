@@ -453,14 +453,16 @@
 #include <stdarg.h>         // va_list, va_start(), va_end()
 #include <inttypes.h>       // intmax_t, PRIuMAX
 #include <setjmp.h>         // jmp_buf, setjmp(), longjmp()
-#include <unistd.h>         // isatty()
-#include "zlib.h"           // crc32(), get_crc_table()
+// #include <unistd.h>         // isatty()
+// #include "zlib.h"           // crc32(), get_crc_table()
 
 #if defined(MSDOS) || defined(OS2) || defined(_WIN32) || defined(__CYGWIN__)
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #  include <fcntl.h>
 #  include <io.h>
 #  define SET_BINARY_MODE(file) _setmode(_fileno(file), O_BINARY)
 #else
+#  include <unistd.h>
 #  define SET_BINARY_MODE(file)
 #endif
 
@@ -575,7 +577,7 @@ struct state {
     int bitbuf;                 // bit buffer
     long chunk;                 // bytes left in this png chunk, or -1
     uint32_t crc;               // running ~CRC of current chunk data
-    z_crc_t const *table;       // CRC table for one-byte updates
+    // z_crc_t const *table;       // CRC table for one-byte updates
     FILE *in;                   // input file
     int seqs;                   // number of bit sequences saved
     short seq[MAXSEQS];         // bits in each sequence
@@ -725,7 +727,7 @@ local int idat(struct state *s) {
         }
 
         // Initialize the CRC with the chunk type.
-        s->crc = ~crc32(crc32(0, Z_NULL, 0), head + 8, 4);
+        // s->crc = ~crc32(crc32(0, Z_NULL, 0), head + 8, 4);
 
         if (s->chunk == 0)
             // Even if this is an IDAT, an empty one is useless. Get the next
@@ -744,7 +746,7 @@ local int idat(struct state *s) {
         do {
             long get = s->chunk > (long)sizeof(junk) ? sizeof(junk) : s->chunk;
             long got = fread(junk, 1, get, s->in);
-            s->crc = ~crc32(~s->crc, junk, got);
+            // s->crc = ~crc32(~s->crc, junk, got);
             s->chunk -= got;
             if (got != get) {
                 warn("invalid PNG structure");
@@ -764,7 +766,7 @@ local inline int get(struct state *s) {
     int ch = s->chunk-- ? getc(s->in) : idat(s);
     if (ch == EOF)
         return ch;
-    s->crc = (s->crc >> 8) ^ s->table[(s->crc ^ ch) & 0xff];
+    // s->crc = (s->crc >> 8) ^ s->table[(s->crc ^ ch) & 0xff];
     return ch;
 }
 
@@ -1746,8 +1748,8 @@ int main(int argc, char **argv) {
             // Now we are four bytes before the start of first png chunk. We
             // set those four bytes of header to be checked as if they are the
             // CRC of a preceding chunk.
-            s.crc = ~0x0d0a1a0a;
-            s.table = get_crc_table();
+            // s.crc = ~0x0d0a1a0a;
+            // s.table = get_crc_table();
 
             // Get what should be a zlib header.
             s.chunk = 0;
@@ -1837,3 +1839,5 @@ int main(int argc, char **argv) {
         bail("i/o error: %s", strerror(errno));
     return ret;
 }
+
+#pragma leco tool
