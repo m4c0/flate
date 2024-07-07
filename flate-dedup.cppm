@@ -4,7 +4,8 @@ import hai;
 
 namespace flate {
 constexpr symbols::symbol dedup(const uint8_t *data, int len, int &ptr) {
-  static constexpr const auto max_dist = 32768;
+  // static constexpr const auto max_dist = 32768;
+  static constexpr const auto max_dist = 1024;
   static constexpr const auto max_len = 258;
 
   if (ptr < 0 || ptr >= len)
