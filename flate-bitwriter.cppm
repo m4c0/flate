@@ -17,35 +17,26 @@ public:
   [[nodiscard]] constexpr const auto &buffer() const { return m_buffer; }
 
   constexpr void write(unsigned data, unsigned bit_count) {
-    if (bit_count > 16)
+    [[unlikely]] if (bit_count > 16)
       silog::fail("attempt of writing more than 16 bits at once");
 
     data &= (1 << bit_count) - 1;
     m_acc |= data << m_bits;
     m_bits += bit_count;
-    while (m_bits >= 8) {
+    [[unlikely]] while (m_bits >= 8) {
       m_buffer.push_back(m_acc);
       m_bits -= 8;
       m_acc >>= 8;
     }
   }
   constexpr void write_be(unsigned data, unsigned bit_count) {
-    if (bit_count > 16)
-      silog::fail("attempt of writing more than 16 bits at once");
-
-    auto mask = 1 << (bit_count - 1);
+    unsigned flip{};
     for (auto i = 0; i < bit_count; i++) {
-      if ((data & mask) != 0) {
-        m_acc |= 1 << m_bits;
-      }
-      m_bits++;
-      mask >>= 1;
-      if (m_bits >= 8) {
-        m_buffer.push_back(m_acc);
-        m_bits -= 8;
-        m_acc >>= 8;
-      }
+      flip <<= 1;
+      flip |= data & 1;
+      data >>= 1;
     }
+    write(flip, bit_count);
   }
 
   constexpr void flush() {
