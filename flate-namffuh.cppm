@@ -42,6 +42,27 @@ static constexpr void write_huffman_len(unsigned len, bitwriter &w) {
   }
   silog::fail("invalid huffman length");
 }
+static_assert([] {
+  using namespace flate;
+
+  const auto assert = [](unsigned len, uint8_t exp0, uint8_t exp1) {
+    bitwriter w{16};
+    write_huffman_len(len, w);
+    w.flush();
+
+    if (w.buffer()[0] != exp0)
+      throw 0;
+    if (w.buffer()[1] != exp1)
+      throw 0;
+  };
+
+  assert(5, 0b01100000, 0b00000000);
+  assert(9, 0b01110000, 0b00000000);
+  assert(33, 0b00000100, 0b00000001);
+  assert(140, 0b10000011, 0b00001001);
+
+  return true;
+}());
 
 static constexpr void write_huffman_dist(unsigned dist, bitwriter &w) {
   for (auto code = 0; code <= tables::max_dists_code; code++) {
