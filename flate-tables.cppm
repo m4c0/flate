@@ -103,9 +103,13 @@ static_assert([] {
   for (auto i = 280; i < 288; i++)
     fixed_hlist[i] = 8;
 
+  hai::array<unsigned> fixed_hdist{32};
+  for (auto &d : fixed_hdist)
+    d = 5;
+
   return huff_tables{
       .hlist = create_huffman_codes(fixed_hlist.begin(), fixed_hlist.size()),
-      .hdist = {},
+      .hdist = create_huffman_codes(fixed_hdist.begin(), fixed_hdist.size()),
   };
 }
 static_assert(create_fixed_huffman_table().hlist.counts[0] == 0);

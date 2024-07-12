@@ -17,22 +17,6 @@ struct symbol {
   uint8_t c{};
 };
 
-[[nodiscard]] static constexpr auto read_fixed_dist(bitstream *bits) {
-  return (bits->next<1>() << 4) | (bits->next<1>() << 3) |
-         (bits->next<1>() << 2) | (bits->next<1>() << 1) | bits->next<1>();
-}
-static constexpr bool test_read_fixed_dist(unsigned input, unsigned expected) {
-  ce_bitstream b{yoyo::ce_reader{input}};
-  return read_fixed_dist(&b) == expected;
-}
-static_assert(test_read_fixed_dist(0b00000, 0));
-static_assert(test_read_fixed_dist(0b10000, 1));
-static_assert(test_read_fixed_dist(0b1000, 2));
-static_assert(test_read_fixed_dist(0b100, 4));
-static_assert(test_read_fixed_dist(0b10, 8));
-static_assert(test_read_fixed_dist(0b1, 16));
-static_assert(test_read_fixed_dist(0b11111, 31));
-
 static constexpr const auto sym = [](auto... a) {
   return mno::req<symbol>{symbol{a...}};
 };
@@ -45,10 +29,7 @@ static constexpr mno::req<symbol> read_repeat(const tables::huff_tables &huff,
   return bits->next(len_bits.bits).fmap([&](auto l) {
     const auto len = len_bits.second + l;
 
-    const auto dist_code = (huff.hdist.counts.size() > 0)
-                               ? decode_huffman(huff.hdist, bits)
-                               : read_fixed_dist(bits);
-    return dist_code.fmap([&](auto dist_code) {
+    return decode_huffman(huff.hdist, bits).fmap([&](auto dist_code) {
       if (dist_code > tables::max_dists_code)
         return mno::req<symbol>::failed("dist code greater than max");
 
