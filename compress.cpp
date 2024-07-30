@@ -16,8 +16,9 @@ static constexpr auto compress(yoyo::writer &w, const uint8_t *data,
   if (buf.size() != size)
     return w.write(buf.begin(), buf.size());
 
-  // write using no-comp
-  return mno::req<void>::failed("TODO: implement uncompressed case");
+  return w
+      .write_u8(1) // final uncompressed
+      .fmap([&] { return w.write(data, size); });
 }
 
 static_assert([] {
