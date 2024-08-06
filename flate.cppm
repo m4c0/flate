@@ -43,14 +43,14 @@ public:
 
   [[nodiscard]] mno::req<unsigned> read_up_to(void *buffer,
                                               unsigned len) override {
-    mno::req<unsigned> acc{};
-    for (unsigned i = 0; i < len && acc.is_valid(); i++) {
-      acc = read_u8().map([&](auto r) {
-        static_cast<uint8_t *>(buffer)[i] = r;
-        return i + 1;
-      });
+    unsigned i{};
+    for (i = 0; i < len; i++) {
+      auto res =
+          read_u8().map([&](auto r) { static_cast<uint8_t *>(buffer)[i] = r; });
+      if (!res.is_valid())
+        break;
     }
-    return acc;
+    return mno::req{i};
   }
   [[nodiscard]] constexpr mno::req<void> read(uint8_t *buffer,
                                               unsigned len) override {
