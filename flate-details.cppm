@@ -17,8 +17,8 @@ static constexpr const auto hlit_min = 257;
 static constexpr const auto hdist_min = 1;
 static constexpr const auto hclen_min = 4;
 
-static constexpr const auto hlit_max = 286;
-static constexpr const auto hdist_max = 32;
+//static constexpr const auto hlit_max = 286;
+//static constexpr const auto hdist_max = 32;
 
 static constexpr const auto max_code_lengths = 19;
 static constexpr const unsigned hclen_order[max_code_lengths] = {

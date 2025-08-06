@@ -1,6 +1,6 @@
 export module flate:bitwriter;
 import hai;
-import silog;
+import print;
 import traits;
 
 using namespace traits::ints;
@@ -17,8 +17,7 @@ public:
   [[nodiscard]] constexpr const auto &buffer() const { return m_buffer; }
 
   constexpr void write(unsigned data, unsigned bit_count) {
-    [[unlikely]] if (bit_count > 16)
-      silog::fail("attempt of writing more than 16 bits at once");
+    [[unlikely]] if (bit_count > 16) die("attempt of writing more than 16 bits at once");
 
     data &= (1 << bit_count) - 1;
     m_acc |= data << m_bits;

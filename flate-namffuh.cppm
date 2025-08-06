@@ -3,7 +3,6 @@ import :bitwriter;
 import :symbols;
 import :tables;
 import hai;
-import silog;
 
 namespace flate {
 static constexpr auto static_huffman_code(unsigned lit) {
@@ -40,7 +39,7 @@ static constexpr void write_huffman_len(unsigned len, bitwriter &w) {
       w.write(len - min, bits);
     return;
   }
-  silog::fail("invalid huffman length");
+  die("invalid huffman length");
 }
 static_assert([] {
   using namespace flate;
@@ -75,7 +74,7 @@ static constexpr void write_huffman_dist(unsigned dist, bitwriter &w) {
       w.write(dist - min, bits);
     return;
   }
-  silog::fail("invalid huffman dist");
+  die("invalid huffman dist");
 }
 
 constexpr void static_huffman_encode(const hai::array<symbol> &syms,
@@ -93,7 +92,7 @@ constexpr void static_huffman_encode(const hai::array<symbol> &syms,
       write_static_huffman(256, w);
       return;
     case type::nil:
-      silog::fail("unexpected symbol found on compression");
+      die("unexpected symbol found on compression");
       break;
     }
   }
