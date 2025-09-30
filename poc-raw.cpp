@@ -9,21 +9,19 @@
 #endif
 
 import flate;
-import traits;
+import print;
 import yoyo;
 
-constexpr const traits::ints::uint8_t lorem_ipsum[] = "HEYHEYHEY YOYO YO";
+constexpr const unsigned char lorem_ipsum[] = "HEYHEYHEY YOYO YO";
 
 static auto create_file() {
-  return yoyo::file_writer::open("out/test.def")
-      .fpeek(flate::compress(lorem_ipsum, sizeof(lorem_ipsum)))
-      .map([](auto &) {});
+  auto w = yoyo::file_writer::open("out/test.def")
+    .take([](auto msg) { die("failed to open file: ", msg); });
+
+  flate::compress(w, lorem_ipsum, sizeof(lorem_ipsum))
+    .take([](auto msg) { die("failed to compress: ", msg); });
 }
 int main() {
-  return create_file()
-      .map([] {
-        return system("out" SEP HOST_TARGET SEP "infgen.exe -d -d out" SEP
-                      "test.def");
-      })
-      .log_error([] { return 1; });
+  create_file();
+  return system("out" SEP HOST_TARGET SEP "infgen.exe -d -d out" SEP "test.def");
 }

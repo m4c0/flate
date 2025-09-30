@@ -9,11 +9,7 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
-export [[nodiscard]] mno::req<void> compress(yoyo::writer &w, const void *data,
-                                             unsigned size);
-export [[nodiscard]] constexpr auto compress(const void *data, unsigned size) {
-  return [=](auto &w) { return compress(w, data, size); };
-}
+export [[nodiscard]] mno::req<void> compress(yoyo::writer & w, const void * data, unsigned size);
 
 export class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
