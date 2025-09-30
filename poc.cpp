@@ -26,16 +26,12 @@ constexpr const uint8_t lorem_ipsum[] =
 int main() {
   putfn("Original string has %d bytes", static_cast<int>(sizeof(lorem_ipsum)));
 
-  hai::array<uint8_t> comp{10240};
-  yoyo::memwriter wr{comp};
+  auto comp = flate::compress(lorem_ipsum, sizeof(lorem_ipsum));
+  putfn("Compressed to %d bytes", comp.size()); 
+
   yoyo::memreader rd{comp.begin(), comp.size()};
-
   flate::bitstream bs{&rd};
-
   hai::array<uint8_t> decomp{10240};
-
-  flate::compress(wr, lorem_ipsum, sizeof(lorem_ipsum));
-  putfn("Compressed to %d bytes", wr.raw_pos()); 
 
   return flate::huffman_reader::create(&bs)
       .fmap([&](auto &hr) {

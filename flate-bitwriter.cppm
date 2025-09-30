@@ -15,6 +15,7 @@ public:
   constexpr bitwriter(unsigned buf_size) : m_buffer{buf_size} {}
 
   [[nodiscard]] constexpr const auto &buffer() const { return m_buffer; }
+  [[nodiscard]] constexpr auto take() { return traits::move(m_buffer); }
 
   constexpr void write(unsigned data, unsigned bit_count) {
     [[unlikely]] if (bit_count > 16) die("attempt of writing more than 16 bits at once");

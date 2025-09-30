@@ -9,16 +9,13 @@
 #endif
 
 import flate;
+import jojo;
 import print;
-import yoyo;
 
 constexpr const unsigned char lorem_ipsum[] = "HEYHEYHEY YOYO YO";
 
 static auto create_file() {
-  auto w = yoyo::file_writer::open("out/test.def")
-    .take([](auto msg) { die("failed to open file: ", msg); });
-
-  flate::compress(w, lorem_ipsum, sizeof(lorem_ipsum));
+  jojo::write("out/test.def", flate::compress(lorem_ipsum, sizeof(lorem_ipsum)));
 }
 int main() {
   create_file();

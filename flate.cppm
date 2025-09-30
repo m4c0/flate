@@ -9,7 +9,7 @@ import yoyo;
 using namespace traits::ints;
 
 namespace flate {
-export void compress(yoyo::writer & w, const void * data, unsigned size);
+export hai::varray<unsigned char> compress(const void * data, unsigned size);
 
 export class huffman_reader : public yoyo::reader {
   bitstream *m_bits;
