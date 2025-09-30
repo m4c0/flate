@@ -13,12 +13,15 @@ static constexpr auto compress(yoyo::writer &w, const uint8_t *data,
   bitw.flush();
 
   auto &buf = bitw.buffer();
-  if (buf.size() != size)
-    return w.write(buf.begin(), buf.size());
-
-  return w
+  if (buf.size() != size) {
+    w.write(buf.begin(), buf.size())
+      .take([](auto msg) { throw 69; });
+  } else {
+    w
       .write_u8(1) // final uncompressed
-      .fmap([&] { return w.write(data, size); });
+      .fmap([&] { return w.write(data, size); })
+      .take([](auto msg) { throw 69; });
+  }
 }
 
 static_assert([] {
@@ -31,8 +34,7 @@ static_assert([] {
   hai::array<uint8_t> buf{16};
   yoyo::memwriter w{buf};
 
-  if (!::compress(w, data, sizeof(data)).is_valid())
-    throw 0;
+  ::compress(w, data, sizeof(data));
 
   constexpr const auto assert = [](auto res, auto exp) {
     if (res != exp)
@@ -49,7 +51,6 @@ static_assert([] {
   return true;
 }());
 
-mno::req<void> flate::compress(yoyo::writer &w, const void *data,
-                               unsigned size) {
-  return ::compress(w, static_cast<const uint8_t *>(data), size);
+void flate::compress(yoyo::writer & w, const void * data, unsigned size) {
+  ::compress(w, static_cast<const uint8_t *>(data), size);
 }

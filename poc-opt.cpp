@@ -12,10 +12,9 @@ static auto compress(const hai::array<char> &data) {
   silog::log(silog::info, "compressing %d bytes", data.size());
   hai::varray<uint8_t> out{1024 * 1024};
   yoyo::memwriter buf{out};
-  return flate::compress(buf, data.begin(), data.size()).map([&] {
-    out.expand(buf.raw_pos());
-    return traits::move(out);
-  });
+  flate::compress(buf, data.begin(), data.size());
+  out.expand(buf.raw_pos());
+  return traits::move(out);
 }
 
 static auto decompress(const hai::varray<uint8_t> &data) {
@@ -34,7 +33,7 @@ int main(int argc, char **argv) {
   auto file = argc == 2 ? argv[1] : "infgen.c";
   yoyo::file_reader::open(file)
       .fmap(yoyo::slurp)
-      .fmap(compress)
+      .map(compress)
       .fmap(decompress)
       .log_error();
 }

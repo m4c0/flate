@@ -34,9 +34,10 @@ int main() {
 
   hai::array<uint8_t> decomp{10240};
 
-  return flate::compress(wr, lorem_ipsum, sizeof(lorem_ipsum))
-      .map([&] { putfn("Compressed to %d bytes", wr.raw_pos()); })
-      .fmap([&] { return flate::huffman_reader::create(&bs); })
+  flate::compress(wr, lorem_ipsum, sizeof(lorem_ipsum));
+  putfn("Compressed to %d bytes", wr.raw_pos()); 
+
+  return flate::huffman_reader::create(&bs)
       .fmap([&](auto &hr) {
         return hr.read_up_to(decomp.begin(), decomp.size());
       })

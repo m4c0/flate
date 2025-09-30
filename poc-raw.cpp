@@ -18,8 +18,7 @@ static auto create_file() {
   auto w = yoyo::file_writer::open("out/test.def")
     .take([](auto msg) { die("failed to open file: ", msg); });
 
-  flate::compress(w, lorem_ipsum, sizeof(lorem_ipsum))
-    .take([](auto msg) { die("failed to compress: ", msg); });
+  flate::compress(w, lorem_ipsum, sizeof(lorem_ipsum));
 }
 int main() {
   create_file();
