@@ -47,7 +47,7 @@ constexpr const auto max_dists_code = 29U;
 struct bit_dists {
   bit_pair data[max_dists_code + 1];
 };
-static constexpr const auto bitdists = [] {
+inline constexpr const auto bitdists = [] {
   bit_dists res{};
   res.data[0] = {0, 1};
   res.data[1] = {0, 2};

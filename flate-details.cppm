@@ -32,7 +32,7 @@ struct dynamic_huffman_format {
   unsigned hclen;
 };
 
-[[nodiscard]] static constexpr auto read_hc_format(bitstream *bits) {
+[[nodiscard]] inline constexpr auto read_hc_format(bitstream *bits) {
   dynamic_huffman_format res{};
   return bits->next<hlit_count_bits>()
       .map([&](auto hlit) { res.hlit = hlit + hlit_min; })
@@ -43,7 +43,7 @@ struct dynamic_huffman_format {
       .map([&] { return res; });
 }
 
-[[nodiscard]] static constexpr auto
+[[nodiscard]] inline constexpr auto
 read_hclens(bitstream *bits, const dynamic_huffman_format &fmt) {
   hai::array<unsigned> buffer{max_code_lengths};
   mno::req<void> res{};
@@ -82,7 +82,7 @@ constexpr const auto repeat_zero_11_138 = 18;
     return mno::req{1U};
   }
 }
-[[nodiscard]] static constexpr auto
+[[nodiscard]] inline constexpr auto
 read_hlit_hdist(const dynamic_huffman_format &fmt,
                 const hai::array<unsigned> &hclens, bitstream *bits) {
   hai::array<unsigned> result{fmt.hlit + fmt.hdist};

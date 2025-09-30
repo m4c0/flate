@@ -42,7 +42,7 @@ static constexpr mno::req<symbol> read_repeat(const tables::huff_tables &huff,
   });
 }
 
-[[nodiscard]] static constexpr mno::req<symbol>
+[[nodiscard]] inline constexpr mno::req<symbol>
 read_next_symbol(const tables::huff_tables &huff, bitstream *bits) {
   return decode_huffman(huff.hlist, bits).fmap([&](auto code) {
     constexpr const auto end_code = 256;

@@ -65,7 +65,7 @@ public:
   }
 
   [[nodiscard]] constexpr mno::req<mno::opt<uint8_t>> next() {
-    assert(m_bits != nullptr);
+    //assert(m_bits != nullptr);
     if (m_uncompressed) {
       if (m_len == 0) {
         return {};
