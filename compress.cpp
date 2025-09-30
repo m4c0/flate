@@ -10,15 +10,17 @@ static constexpr hai::varray<unsigned char> compress(const uint8_t * data, unsig
   auto syms = dedup_all(data, size);
   static_huffman_encode(syms, bitw);
   bitw.flush();
+  return bitw.take();
 
-  auto & buf = bitw.buffer();
-  if (buf.size() != size) return bitw.take();
-
-  hai::varray<unsigned char> res { 1 + size };
-  res.expand(1 + size);
-  res[0] = 1;
-  for (auto i = 0; i < size; i++) res[i + 1] = data[i];
-  return res;
+  // We could also use "stored" as optimisation if the uncompressed size is
+  // smaller than the buffer size plus 1 plus 2 "words".
+  //
+  // The spec expects us to do something like:
+  // 1 bit = 1    "last block"
+  // 2 bits = 00  "stored"
+  // 1 "word" = length (no idea what is a "word" for them)
+  // 1 "word" = ~length
+  // Data follows
 }
 
 static_assert([] {
