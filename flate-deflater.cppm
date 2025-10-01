@@ -36,33 +36,30 @@ export class deflater {
   }
 
 public:
-  explicit constexpr deflater(bitstream * b) {
-    set_next_block(b).take([](auto) { throw 42; });
-  }
+  explicit constexpr deflater(bitstream * b) { set_next_block(b); }
 
-  [[nodiscard]] constexpr mno::req<void> set_next_block(bitstream *b) {
+  constexpr void set_next_block(bitstream *b) {
     m_bits = b;
 
-    return m_bits->next<1>()
-        .map([this](auto b) { m_last_block = b == 1; })
-        .fmap([this] { return m_bits->next<2>(); })
-        .fmap([this](auto b) -> mno::req<void> {
-          switch (b) {
-          case 0:
-            m_uncompressed = true;
-            return read_huff0_len();
-          case 1:
-            m_uncompressed = false;
-            m_tables = tables::create_fixed_huffman_table();
-            return {};
-          case 2: {
-            m_uncompressed = false;
-            return read_huff2_tables();
-          }
-          default:
-            return mno::req<void>::failed("unsupported huffman encoding");
-          }
-        });
+    m_last_block = 1 == m_bits->next<1>().take([](auto) { throw 42; });
+    switch (m_bits->next<2>().take([](auto) { throw 42; })) {
+      case 0:
+        m_uncompressed = true;
+        read_huff0_len().take([](auto) { throw 42; });
+        break;
+      case 1:
+        m_uncompressed = false;
+        m_tables = tables::create_fixed_huffman_table();
+        break;
+      case 2: {
+        m_uncompressed = false;
+        read_huff2_tables().take([](auto) { throw 42; });;
+        break;
+      }
+      default:
+        // TODO: define how to throw "unsupported huffman encoding"
+        throw 42;
+    }
   }
 
   [[nodiscard]] constexpr mno::req<mno::opt<uint8_t>> next() {
@@ -173,11 +170,11 @@ static_assert([] {
   return mno::req { &d }
       .assert([](auto &d) { return d->next() == 'H'; }, "H")
       .assert(has_ended, "")
-      .fpeek([&](auto d) { return d->set_next_block(&b2); })
+      .peek([&](auto d) { d->set_next_block(&b2); })
       .assert([](auto d) { return d->next() == 'E'; }, "E")
       .assert([](auto d) { return d->next() == 'Y'; }, "Y")
       .assert(has_ended, "")
-      .fpeek([&](auto d) { return d->set_next_block(&b3); })
+      .peek([&](auto d) { d->set_next_block(&b3); })
       .assert([](auto d) { return d->next() == 'H'; }, "H")
       .assert([](auto d) { return d->next() == 'E'; }, "E")
       .assert([](auto d) { return d->next() == 'Y'; }, "Y")

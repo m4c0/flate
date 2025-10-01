@@ -45,7 +45,7 @@ public:
         break;
       }
 
-      m_d.set_next_block(&m_bits).take(fail);
+      m_d.set_next_block(&m_bits);
     }
     return i;
   }
