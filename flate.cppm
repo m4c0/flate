@@ -4,7 +4,6 @@ export import :bitstream;
 export import :deflater;
 import jute;
 import traits;
-import yoyo;
 
 using namespace traits::ints;
 
