@@ -66,14 +66,12 @@ public:
       return mno::req { mno::opt { static_cast<uint8_t>(m_bits->next<8>()) } };
     }
     if (m_buffer.empty()) {
-      return symbols::read_next_symbol(m_tables, m_bits)
-          .map([this](auto sym) -> mno::opt<uint8_t> {
-            if (!m_buffer.visit(sym)) {
-              m_bits = nullptr;
-              return {};
-            }
-            return mno::opt<uint8_t>{m_buffer.read()};
-          });
+      auto sym = symbols::read_next_symbol(m_tables, m_bits);
+      if (!m_buffer.visit(sym)) {
+        m_bits = nullptr;
+        return mno::req { mno::opt<uint8_t> {} };
+      }
+      return mno::req{mno::opt<uint8_t>{m_buffer.read()}};
     }
     return mno::req{mno::opt<uint8_t>{m_buffer.read()}};
   }
