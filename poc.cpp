@@ -4,7 +4,6 @@ import flate;
 import hai;
 import print;
 import traits;
-import yoyo;
 
 using namespace traits::ints;
 

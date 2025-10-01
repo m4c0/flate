@@ -2,7 +2,6 @@ export module flate:details;
 import :bitstream;
 import :huffman;
 import hai;
-import yoyo;
 
 namespace flate::details {
 // Magic constants gallore - it should follow this RFC:

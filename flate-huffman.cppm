@@ -1,7 +1,6 @@
 export module flate:huffman;
 import :bitstream;
 import hai;
-import yoyo;
 
 namespace flate {
 using uint_array = hai::array<unsigned>;

@@ -4,7 +4,6 @@ import :huffman;
 import :tables;
 import hai;
 import traits;
-import yoyo;
 
 using namespace traits::ints;
 

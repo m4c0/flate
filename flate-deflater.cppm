@@ -4,7 +4,6 @@ import :buffer;
 import :details;
 import :symbols;
 import traits;
-import yoyo;
 
 using namespace traits::ints;
 
