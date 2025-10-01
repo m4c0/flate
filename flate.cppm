@@ -11,86 +11,45 @@ using namespace traits::ints;
 namespace flate {
 export hai::varray<unsigned char> compress(const void * data, unsigned size);
 
-export class huffman_reader : public yoyo::reader {
-  bitstream *m_bits;
+export class decompresser {
+  bitstream m_bits;
   deflater m_d;
-  bool m_finished{};
+  bool m_finished = false;
+
+  [[noreturn]] static void fail(jute::view msg) {
+    throw 42; // TODO: define how to handle errors
+  }
 
 public:
-  static constexpr mno::req<huffman_reader> create(bitstream *bits) {
-    huffman_reader res{};
-    res.m_bits = bits;
-    return deflater::from(bits).map([&](auto &d) {
-      res.m_d = traits::move(d);
-      return traits::move(res);
-    });
-  }
+  constexpr decompresser(const void * data, unsigned size) :
+    m_bits { static_cast<const unsigned char *>(data), size }
+  , m_d { deflater::from(&m_bits).take(fail) }
+  {}
 
-  [[nodiscard]] constexpr mno::req<bool> eof() const override {
-    return mno::req{m_d.last_block() && m_finished};
-  }
-  [[nodiscard]] constexpr mno::req<void>
-  seekg(int64_t /*pos*/, yoyo::seek_mode /*mode*/) override {
-    return mno::req<void>::failed("unsupported seek in huffman reader");
-  }
-  [[nodiscard]] constexpr mno::req<uint64_t> tellg() const override {
-    return mno::req<uint64_t>::failed("unsupported tellg in huffman reader");
-  }
+  constexpr bool eof() const { return m_d.last_block() && m_finished; }
+  constexpr operator bool() const { return !eof(); }
 
-  [[nodiscard]] mno::req<unsigned> read_up_to(void *buffer,
-                                              unsigned len) override {
-    unsigned i{};
-    for (i = 0; i < len; i++) {
-      auto res =
-          read_u8().map([&](auto r) { static_cast<uint8_t *>(buffer)[i] = r; });
-      if (!res.is_valid())
-        break;
-    }
-    return mno::req{i};
-  }
-  [[nodiscard]] constexpr mno::req<void> read(uint8_t *buffer,
-                                              unsigned len) override {
-    mno::req<void> acc{};
-    for (unsigned i = 0; i < len && acc.is_valid(); i++) {
-      acc = read_u8().map([&](auto r) { buffer[i] = r; });
-    }
-    return acc;
-  }
-  [[nodiscard]] mno::req<void> read(void *buffer, unsigned len) override {
-    return read(static_cast<uint8_t *>(buffer), len);
-  }
-
-  [[nodiscard]] constexpr mno::req<uint8_t> read_u8() override {
-    return m_d.next().fmap([this](auto r) {
-      if (r)
-        return mno::req<uint8_t>{r.unwrap(0U)};
+  [[nodiscard]] constexpr int read(void * buffer, unsigned size) {
+    auto ptr = static_cast<unsigned char *>(buffer);
+    auto i = 0;
+    while (!eof() && i < size) {
+      auto r = m_d.next().take(fail);
+      if (r) {
+        ptr[i++] = r.unwrap(0U);
+        continue;
+      }
 
       if (m_d.last_block()) {
         m_finished = true;
-        return mno::req<uint8_t>::failed("end of deflate stream");
+        break;
       }
 
-      return m_d.set_next_block(m_bits)
-          .fmap([this] { return m_d.next(); })
-          .map([](auto r) { return r.unwrap(0U); });
-    });
+      m_d.set_next_block(&m_bits).take(fail);
+    }
+    return i;
   }
-
-  [[nodiscard]] constexpr mno::req<uint16_t> read_u16() override {
-    constexpr const auto bits_per_byte = 8U;
-    return mno::combine(
-        [](auto a, auto b) -> uint16_t {
-          return (static_cast<unsigned>(a) << bits_per_byte) | b;
-        },
-        read_u8(), read_u8());
-  }
-  [[nodiscard]] constexpr mno::req<uint32_t> read_u32() override {
-    constexpr const auto bits_per_word = 16U;
-    return mno::combine(
-        [](auto a, auto b) -> uint32_t {
-          return (static_cast<unsigned>(a) << bits_per_word) | b;
-        },
-        read_u16(), read_u16());
+  constexpr void read_all(void * buffer, unsigned size) {
+    if (read(buffer, size) != size) throw 42; // TODO: define error strategy
   }
 };
 } // namespace flate
@@ -137,15 +96,9 @@ static_assert([]() {
 
   uint8_t res[expected.size()]{};
 
-  bitstream b { ex1, 420 };
-  return flate::huffman_reader::create(&b)
-      .fmap([&](auto &hr) { return hr.read(res, expected.size()); })
-      .map([&] {
-        const auto *ptr = res;
-        for (auto c : expected)
-          if (c != *ptr++)
-            throw 0;
-        return true;
-      })
-      .unwrap(false);
+  decompresser { ex1, 420 }.read_all(res, expected.size());
+
+  const auto * ptr = res;
+  for (auto c : expected) if (c != *ptr++) throw 0;
+  return true;
 }());

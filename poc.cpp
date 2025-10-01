@@ -28,14 +28,7 @@ int main() {
   auto comp = flate::compress(lorem_ipsum, sizeof(lorem_ipsum));
   putfn("Compressed to %d bytes", comp.size()); 
 
-  flate::bitstream bs { comp.begin(), comp.size() };
   hai::array<uint8_t> decomp{10240};
-
-  return flate::huffman_reader::create(&bs)
-      .fmap([&](auto &hr) {
-        return hr.read_up_to(decomp.begin(), decomp.size());
-      })
-      .map([](auto n) { putfn("Got %d bytes back", n); })
-      .map([] { return 0; })
-      .log_error([&] { return 1; });
+  auto n = flate::decompresser { comp.begin(), comp.size() }.read(decomp.begin(), decomp.size());
+  putfn("Got %d bytes back", n);
 }

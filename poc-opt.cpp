@@ -16,14 +16,10 @@ static auto compress(const hai::array<char> &data) {
 
 static auto decompress(const hai::varray<uint8_t> &data) {
   putfn("decompressing %d bytes", data.size());
-  flate::bitstream bs { data.begin(), data.size() };
-  flate::huffman_reader::create(&bs)
-      .fmap([&](auto &hr) {
-        hai::array<uint8_t> dec{1024 * 1024};
-        return hr.read_up_to(dec.begin(), dec.size());
-      })
-      .map([](auto n) { putfn("got %d bytes back", n); })
-      .log_error();
+
+  hai::array<uint8_t> dec { 1024 * 1024 };
+  auto n = flate::decompresser { data.begin(), data.size() }.read(dec.begin(), dec.size());
+  putfn("got %d bytes back", n);
 }
 
 int main(int argc, char **argv) {
