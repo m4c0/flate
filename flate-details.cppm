@@ -2,6 +2,7 @@ export module flate:details;
 import :bitstream;
 import :huffman;
 import hai;
+import missingno;
 
 namespace flate::details {
 // Magic constants gallore - it should follow this RFC:
@@ -77,24 +78,23 @@ constexpr const auto repeat_zero_11_138 = 18;
     return 1U;
   }
 }
-[[nodiscard]] inline constexpr auto
-read_hlit_hdist(const dynamic_huffman_format &fmt,
-                const hai::array<unsigned> &hclens, bitstream *bits) {
+[[nodiscard]] inline constexpr auto read_hlit_hdist(
+    const dynamic_huffman_format & fmt,
+    const hai::array<unsigned> & hclens,
+    bitstream *bits) {
   hai::array<unsigned> result{fmt.hlit + fmt.hdist};
 
   auto huff = create_huffman_codes(hclens.begin(), hclens.size());
   auto previous = 0U;
   auto *it = result.begin();
-  mno::req<void> res{};
-  while (it != result.end() && res.is_valid()) {
-    res = decode_huffman(huff, bits).map([&](auto code) {
-      auto to_repeat = code_to_repeat(code, previous);
-      auto count = repeat_count(code, bits);
-      for (int j = 0; j < count; j++) *it++ = to_repeat;
-      previous = to_repeat;
-    });
+  while (it != result.end()) {
+    auto code = decode_huffman(huff, bits);
+    auto to_repeat = code_to_repeat(code, previous);
+    auto count = repeat_count(code, bits);
+    for (int j = 0; j < count; j++) *it++ = to_repeat;
+    previous = to_repeat;
   }
-  return res.map([&] { return traits::move(result); });
+  return result;
 }
 } // namespace flate::details
 
@@ -138,7 +138,6 @@ using namespace flate::details;
 
 static_assert([] {
   constexpr const auto fail = [] -> bool { throw 0; };
-  constexpr const auto fail_ = [](auto) { throw 0; };
 
   bitstream b { ex1, 410 };
 
@@ -157,21 +156,12 @@ static_assert([] {
       throw 0;
   }
 
-  return read_hlit_hdist(fmt, hclens, &b)
-      .map([](auto &res) {
-        if (res[0] != 0)
-          return false;
-        if (res[9] != 0)
-          return false; // NOLINT
-        if (res[10] != 6)
-          return false; // NOLINT
-        if (res[32] != 4)
-          return false; // NOLINT
-        if (res[58] != 6)
-          return false; // NOLINT
-        if (res[274 + 18] != 6)
-          return false; // NOLINT
-        return true;
-      })
-      .take(fail_);
+  auto res = read_hlit_hdist(fmt, hclens, &b);
+  if (res[0] != 0)        return false;
+  if (res[9] != 0)        return false; // NOLINT
+  if (res[10] != 6)       return false; // NOLINT
+  if (res[32] != 4)       return false; // NOLINT
+  if (res[58] != 6)       return false; // NOLINT
+  if (res[274 + 18] != 6) return false; // NOLINT
+  return true;
 }());

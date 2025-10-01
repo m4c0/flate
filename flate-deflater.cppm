@@ -25,11 +25,9 @@ export class deflater {
   }
   [[nodiscard]] constexpr mno::req<void> read_huff2_tables() {
     auto fmt = details::read_hc_format(m_bits);
-    return details::read_hclens(m_bits, fmt).fmap([&](auto &lens) {
-      return details::read_hlit_hdist(fmt, lens, m_bits)
-        .map([&](auto &hlit_hdist) {
-          m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
-        });
+    return details::read_hclens(m_bits, fmt).map([&](auto &lens) {
+      auto hlit_hdist = details::read_hlit_hdist(fmt, lens, m_bits);
+      m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
     });
   }
 

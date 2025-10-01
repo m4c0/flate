@@ -1,9 +1,10 @@
 export module flate:huffman;
 import :bitstream;
 import hai;
-import missingno;
 
 namespace flate {
+  export struct invalid_huffman_code {};
+
 using uint_array = hai::array<unsigned>;
 
 struct huffman_codes {
@@ -56,8 +57,7 @@ static constexpr auto max(const unsigned *lens, unsigned max_codes) {
   return res;
 }
 
-[[nodiscard]] constexpr auto decode_huffman(const huffman_codes &hc,
-                                            bitstream *bits) {
+[[nodiscard]] constexpr unsigned decode_huffman(const huffman_codes &hc, bitstream *bits) {
   unsigned code = 0;
   unsigned first = 0;
   unsigned index = 0;
@@ -65,14 +65,13 @@ static constexpr auto max(const unsigned *lens, unsigned max_codes) {
     auto count = *it;
 
     code |= bits->next<1>();
-    if (code < first + count) {
-      return mno::req{hc.indexes[index + code - first]};
-    }
+    if (code < first + count) return hc.indexes[index + code - first];
+
     index += count;
     first = (first + count) << 1U;
     code <<= 1U;
   }
-  return mno::req<unsigned>::failed("invalid huffman code");
+  throw invalid_huffman_code {};
 }
 } // namespace flate
 

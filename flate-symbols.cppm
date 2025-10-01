@@ -3,6 +3,7 @@ import :bitstream;
 import :huffman;
 import :tables;
 import hai;
+import missingno;
 import traits;
 
 using namespace traits::ints;
@@ -26,28 +27,23 @@ static constexpr mno::req<symbol> read_repeat(const tables::huff_tables &huff,
 
   const auto len_bits = tables::bitlens.data[code];
   const auto len = len_bits.second + bits->next(len_bits.bits);
+  const auto dist_code = decode_huffman(huff.hdist, bits);
+  if (dist_code > tables::max_dists_code)
+    return mno::req<symbol>::failed("dist code greater than max");
 
-  return decode_huffman(huff.hdist, bits).fmap([&](auto dist_code) {
-    if (dist_code > tables::max_dists_code)
-      return mno::req<symbol>::failed("dist code greater than max");
-
-    const auto dist_bits = tables::bitdists.data[dist_code];
-    const auto dist = dist_bits.second + bits->next(dist_bits.bits);
-    return mno::req{symbol{type::repeat, len, dist}};
-  });
+  const auto dist_bits = tables::bitdists.data[dist_code];
+  const auto dist = dist_bits.second + bits->next(dist_bits.bits);
+  return mno::req{symbol{type::repeat, len, dist}};
 }
 
 [[nodiscard]] inline constexpr mno::req<symbol>
 read_next_symbol(const tables::huff_tables &huff, bitstream *bits) {
-  return decode_huffman(huff.hlist, bits).fmap([&](auto code) {
-    constexpr const auto end_code = 256;
+  const auto code = decode_huffman(huff.hlist, bits);
+  constexpr const auto end_code = 256;
 
-    if (code < end_code)
-      return sym(type::raw, 0U, 0U, static_cast<uint8_t>(code));
-    if (code == end_code)
-      return sym(type::end);
-    return read_repeat(huff, bits, code);
-  });
+  if (code < end_code)  return sym(type::raw, 0U, 0U, static_cast<uint8_t>(code));
+  if (code == end_code) return sym(type::end);
+  return read_repeat(huff, bits, code);
 }
 } // namespace flate::symbols
 
