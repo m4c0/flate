@@ -56,25 +56,26 @@ public:
     }
   }
 
-  [[nodiscard]] constexpr mno::req<mno::opt<uint8_t>> next() {
+  [[nodiscard]] constexpr mno::opt<uint8_t> next() {
     //assert(m_bits != nullptr);
     if (m_uncompressed) {
       if (m_len == 0) {
         return {};
       }
       m_len--;
-      return mno::req { mno::opt { static_cast<uint8_t>(m_bits->next<8>()) } };
+      return mno::opt { static_cast<uint8_t>(m_bits->next<8>()) };
     }
     if (m_buffer.empty()) {
       auto sym = symbols::read_next_symbol(m_tables, m_bits);
       if (!m_buffer.visit(sym)) {
         m_bits = nullptr;
-        return mno::req { mno::opt<uint8_t> {} };
+        return {};
       }
-      return mno::req{mno::opt<uint8_t>{m_buffer.read()}};
+      return mno::opt<uint8_t> { m_buffer.read() };
     }
-    return mno::req{mno::opt<uint8_t>{m_buffer.read()}};
+    return mno::opt<uint8_t> { m_buffer.read() };
   }
+
   [[nodiscard]] constexpr auto last_block() const noexcept {
     return m_last_block;
   }
@@ -135,7 +136,7 @@ static_assert([] {
   deflater d { &b };
   (d.next() == 93) || fail();
   (d.next() == 15) || fail();
-  return !d.next().take([](auto) {throw 0; });;
+  return !d.next();
 }());
 static_assert([] {
   // Tests with fixed huffman table
@@ -153,18 +154,18 @@ static_assert([] {
   deflater d { &b1 };
 
   (d.next() == 'H') || fail();
-  !d.next().take([](auto) { throw 0; }) || fail();
+  !d.next() || fail();
 
   d.set_next_block(&b2);
   (d.next() == 'E') || fail();
   (d.next() == 'Y') || fail();
-  !d.next().take([](auto) { throw 0; }) || fail();
+  !d.next() || fail();
 
   d.set_next_block(&b3);
   (d.next() == 'H') || fail();
   (d.next() == 'E') || fail();
   (d.next() == 'Y') || fail();
-  !d.next().take([](auto) { throw 0; }) || fail();
+  !d.next() || fail();
 
   return true;
 }());

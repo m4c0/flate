@@ -15,10 +15,6 @@ export class decompresser {
   deflater m_d;
   bool m_finished = false;
 
-  [[noreturn]] static void fail(jute::view msg) {
-    throw 42; // TODO: define how to handle errors
-  }
-
 public:
   constexpr decompresser(const void * data, unsigned size) :
     m_bits { data, size }
@@ -34,7 +30,7 @@ public:
     auto ptr = static_cast<unsigned char *>(buffer);
     auto i = 0;
     while (!eof() && i < size) {
-      auto r = m_d.next().take(fail);
+      auto r = m_d.next();
       if (r) {
         ptr[i++] = r.unwrap(0U);
         continue;
