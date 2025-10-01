@@ -36,7 +36,9 @@ export class deflater {
   }
 
 public:
-  explicit constexpr deflater() = default;
+  explicit constexpr deflater(bitstream * b) {
+    set_next_block(b).take([](auto) { throw 42; });
+  }
 
   [[nodiscard]] constexpr mno::req<void> set_next_block(bitstream *b) {
     m_bits = b;
@@ -87,11 +89,6 @@ public:
   [[nodiscard]] constexpr auto last_block() const noexcept {
     return m_last_block;
   }
-
-  [[nodiscard]] static constexpr auto from(bitstream *first_block) {
-    deflater d{};
-    return d.set_next_block(first_block).map([&] { return traits::move(d); });
-  }
 };
 } // namespace flate
 
@@ -131,11 +128,12 @@ constexpr const unsigned char real_zip_block_example[410] {
 };
 static_assert([] {
   bitstream b { real_zip_block_example, 410 };
-  return flate::deflater::from(&b)
-      .assert([](auto &d) { return d.next() == '#'; }, "#")
-      .assert([](auto &d) { return d.next() == 'i'; }, "i")
-      .assert([](auto &d) { return d.next() == 'n'; }, "n")
-      .map([](auto &) { return true; })
+  deflater d { &b };
+  return mno::req { &d }
+      .assert([](auto d) { return d->next() == '#'; }, "#")
+      .assert([](auto d) { return d->next() == 'i'; }, "i")
+      .assert([](auto d) { return d->next() == 'n'; }, "n")
+      .map([](auto) { return true; })
       .unwrap(false);
 }());
 static_assert([] {
@@ -146,16 +144,17 @@ static_assert([] {
       93, 15 // DATA
   };
   bitstream b { data, 7 };
-  return flate::deflater::from(&b)
-      .assert([](auto &d) { return d.next() == 93; }, "93")
-      .assert([](auto &d) { return d.next() == 15; }, "15")
-      .fmap([](auto &d) { return d.next(); })
+  deflater d { &b };
+  return mno::req { &d }
+      .assert([](auto d) { return d->next() == 93; }, "93")
+      .assert([](auto d) { return d->next() == 15; }, "15")
+      .fmap([](auto d) { return d->next(); })
       .map([](auto b) { return !b; })
       .unwrap(false);
 }());
 static_assert([] {
   static constexpr const auto has_ended = [](auto &d) {
-    return d.next().map([](auto n) { return !n; }).unwrap(false);
+    return d->next().map([](auto n) { return !n; }).unwrap(false);
   };
 
   // Tests with fixed huffman table
@@ -170,18 +169,19 @@ static_assert([] {
   const unsigned char buf3[] { 0b00000011, 0b0100010, 0 };
   bitstream b3 { buf3, 3 };
 
-  return flate::deflater::from(&b1)
-      .assert([](auto &d) { return d.next() == 'H'; }, "H")
+  deflater d { &b1 };
+  return mno::req { &d }
+      .assert([](auto &d) { return d->next() == 'H'; }, "H")
       .assert(has_ended, "")
-      .fpeek([&](auto &d) { return d.set_next_block(&b2); })
-      .assert([](auto &d) { return d.next() == 'E'; }, "E")
-      .assert([](auto &d) { return d.next() == 'Y'; }, "Y")
+      .fpeek([&](auto d) { return d->set_next_block(&b2); })
+      .assert([](auto d) { return d->next() == 'E'; }, "E")
+      .assert([](auto d) { return d->next() == 'Y'; }, "Y")
       .assert(has_ended, "")
-      .fpeek([&](auto &d) { return d.set_next_block(&b3); })
-      .assert([](auto &d) { return d.next() == 'H'; }, "H")
-      .assert([](auto &d) { return d.next() == 'E'; }, "E")
-      .assert([](auto &d) { return d.next() == 'Y'; }, "Y")
+      .fpeek([&](auto d) { return d->set_next_block(&b3); })
+      .assert([](auto d) { return d->next() == 'H'; }, "H")
+      .assert([](auto d) { return d->next() == 'E'; }, "E")
+      .assert([](auto d) { return d->next() == 'Y'; }, "Y")
       .assert(has_ended, "")
-      .map([](auto &) { return true; })
+      .map([](auto) { return true; })
       .unwrap(false);
 }());

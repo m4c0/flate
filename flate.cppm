@@ -22,8 +22,8 @@ export class decompresser {
 
 public:
   constexpr decompresser(const void * data, unsigned size) :
-    m_bits { static_cast<const unsigned char *>(data), size }
-  , m_d { deflater::from(&m_bits).take(fail) }
+    m_bits { data, size }
+  , m_d { &m_bits }
   {}
 
   constexpr decompresser(const auto & data) : decompresser { data.data(), data.size() } {}

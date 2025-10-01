@@ -35,8 +35,8 @@ export class bitstream {
   }
 
 public:
-  explicit constexpr bitstream(const unsigned char * ptr, unsigned sz) :
-    m_comp_ptr { ptr }
+  explicit constexpr bitstream(const void * ptr, unsigned sz) :
+    m_comp_ptr { static_cast<const unsigned char *>(ptr) }
   , m_comp_rem { sz }
   {}
 
