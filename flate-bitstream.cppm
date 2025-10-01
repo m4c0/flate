@@ -81,20 +81,13 @@ static inline constexpr const unsigned char data[] { 0x8d, 0x52, 0x4d };
 
 static_assert([] {
   bitstream b { data, 3 };
-  if (b.next<1>() != 1)
-    return false;
-  if (b.next<2>() != 0b10)
-    return false; // NOLINT
-  if (b.next<5>() != 17)
-    return false; // NOLINT
-  if (b.next<5>() != 18)
-    return false; // NOLINT
-  if (b.next<4>() != 10)
-    return false; // NOLINT
-  if (b.next<3>() != 6)
-    return false; // NOLINT
-  if (b.next<3>() != 4)
-    return false; // NOLINT
+  if (b.next<1>() != 1)    return false;
+  if (b.next<2>() != 0b10) return false; // NOLINT
+  if (b.next<5>() != 17)   return false; // NOLINT
+  if (b.next<5>() != 18)   return false; // NOLINT
+  if (b.next<4>() != 10)   return false; // NOLINT
+  if (b.next<3>() != 6)    return false; // NOLINT
+  if (b.next<3>() != 4)    return false; // NOLINT
   return true;
 }());
 // Skip nothing from beginning
@@ -106,8 +99,7 @@ static_assert([] {
 // Skip nothing from somewhere
 static_assert([] {
   bitstream b { data, 3 };
-  if (b.next<1>() != 1)
-    return false;
+  if (b.next<1>() != 1) return false;
   b.skip<2>();
   return b.next<5>() == 17;
 }());
