@@ -10,6 +10,8 @@ using namespace traits::ints;
 namespace flate {
 export hai::varray<unsigned char> compress(const void * data, unsigned size);
 
+export struct buffer_underrun {};
+
 export class decompresser {
   bitstream m_bits;
   deflater m_d;
@@ -54,7 +56,7 @@ public:
   }
 
   constexpr void read_all(void * buffer, unsigned size) {
-    if (read(buffer, size) != size) throw 42; // TODO: define error strategy
+    if (read(buffer, size) != size) throw buffer_underrun {};
   }
   constexpr void read_all(auto & buf) {
     return read(buf.data(), buf.size());

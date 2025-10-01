@@ -8,6 +8,8 @@ import traits;
 using namespace traits::ints;
 
 namespace flate {
+  export struct unsupported_huffman_encoding {};
+
 export class deflater {
   bitstream *m_bits{};
   tables::huff_tables m_tables{};
@@ -56,9 +58,7 @@ public:
         read_huff2_tables().take([](auto) { throw 42; });;
         break;
       }
-      default:
-        // TODO: define how to throw "unsupported huffman encoding"
-        throw 42;
+      default: throw unsupported_huffman_encoding {};
     }
   }
 
