@@ -3,6 +3,7 @@ import :bitstream;
 import :buffer;
 import :details;
 import :symbols;
+import missingno;
 import traits;
 
 using namespace traits::ints;
@@ -23,12 +24,11 @@ export class deflater {
     m_len = m_bits->next<8>() + (m_bits->next<8>() << 8);
     m_bits->skip<16>(); 
   }
-  [[nodiscard]] constexpr mno::req<void> read_huff2_tables() {
+  constexpr void read_huff2_tables() {
     auto fmt = details::read_hc_format(m_bits);
-    return details::read_hclens(m_bits, fmt).map([&](auto &lens) {
-      auto hlit_hdist = details::read_hlit_hdist(fmt, lens, m_bits);
-      m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
-    });
+    auto lens = details::read_hclens(m_bits, fmt);
+    auto hlit_hdist = details::read_hlit_hdist(fmt, lens, m_bits);
+    m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
   }
 
 public:
@@ -49,7 +49,7 @@ public:
         break;
       case 2: {
         m_uncompressed = false;
-        read_huff2_tables().take([](auto) { throw 42; });;
+        read_huff2_tables();
         break;
       }
       default: throw unsupported_huffman_encoding {};

@@ -2,7 +2,6 @@ export module flate:details;
 import :bitstream;
 import :huffman;
 import hai;
-import missingno;
 
 namespace flate::details {
 // Magic constants gallore - it should follow this RFC:
@@ -40,14 +39,12 @@ struct dynamic_huffman_format {
   };
 }
 
-[[nodiscard]] inline constexpr auto
-read_hclens(bitstream *bits, const dynamic_huffman_format &fmt) {
+[[nodiscard]] inline constexpr auto read_hclens(bitstream * bits, const dynamic_huffman_format & fmt) {
   hai::array<unsigned> buffer{max_code_lengths};
-  mno::req<void> res{};
-  for (int i = 0; i < fmt.hclen && res.is_valid(); i++) {
+  for (int i = 0; i < fmt.hclen; i++) {
     buffer[hclen_order[i]] = bits->next<hclen_bits>();
   }
-  return res.map([&] { return traits::move(buffer); });
+  return buffer;
 }
 
 constexpr const auto copy_previous = 16;
@@ -148,7 +145,7 @@ static_assert([] {
   (fmt.hdist == 19) || fail();
   (fmt.hclen == 14) || fail();
 
-  auto hclens = read_hclens(&b, fmt).take([](auto) { throw 0; });
+  auto hclens = read_hclens(&b, fmt);
   const unsigned exp_hclens[19]{2, 0, 0, 5, 4, 4, 2, 3, 3, 0,
                                 0, 0, 0, 0, 0, 0, 6, 4, 6};
   for (auto i = 0; i < 19; i++) {
