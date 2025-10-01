@@ -115,15 +115,14 @@ constexpr const unsigned char real_zip_block_example[410] {
     0x4d, 0xc3, 0xbf, 0x1e, 0x67, 0x98, 0xc3, 0x68, 0xd4, 0x23, 0x83, 0x91,
     0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
 };
+static constexpr bool fail() { throw 0; }
 static_assert([] {
   bitstream b { real_zip_block_example, 410 };
   deflater d { &b };
-  return mno::req { &d }
-      .assert([](auto d) { return d->next() == '#'; }, "#")
-      .assert([](auto d) { return d->next() == 'i'; }, "i")
-      .assert([](auto d) { return d->next() == 'n'; }, "n")
-      .map([](auto) { return true; })
-      .unwrap(false);
+  (d.next() == '#') || fail();
+  (d.next() == 'i') || fail();
+  (d.next() == 'n') || fail();
+  return true;
 }());
 static_assert([] {
   const unsigned char data[] {
@@ -134,18 +133,11 @@ static_assert([] {
   };
   bitstream b { data, 7 };
   deflater d { &b };
-  return mno::req { &d }
-      .assert([](auto d) { return d->next() == 93; }, "93")
-      .assert([](auto d) { return d->next() == 15; }, "15")
-      .fmap([](auto d) { return d->next(); })
-      .map([](auto b) { return !b; })
-      .unwrap(false);
+  (d.next() == 93) || fail();
+  (d.next() == 15) || fail();
+  return !d.next().take([](auto) {throw 0; });;
 }());
 static_assert([] {
-  static constexpr const auto has_ended = [](auto &d) {
-    return d->next().map([](auto n) { return !n; }).unwrap(false);
-  };
-
   // Tests with fixed huffman table
   // H = 00110000 + 01001000 = 01111000
   const unsigned char buf1[] { 0b11110011, 0, 0 };
@@ -159,18 +151,20 @@ static_assert([] {
   bitstream b3 { buf3, 3 };
 
   deflater d { &b1 };
-  return mno::req { &d }
-      .assert([](auto &d) { return d->next() == 'H'; }, "H")
-      .assert(has_ended, "")
-      .peek([&](auto d) { d->set_next_block(&b2); })
-      .assert([](auto d) { return d->next() == 'E'; }, "E")
-      .assert([](auto d) { return d->next() == 'Y'; }, "Y")
-      .assert(has_ended, "")
-      .peek([&](auto d) { d->set_next_block(&b3); })
-      .assert([](auto d) { return d->next() == 'H'; }, "H")
-      .assert([](auto d) { return d->next() == 'E'; }, "E")
-      .assert([](auto d) { return d->next() == 'Y'; }, "Y")
-      .assert(has_ended, "")
-      .map([](auto) { return true; })
-      .unwrap(false);
+
+  (d.next() == 'H') || fail();
+  !d.next().take([](auto) { throw 0; }) || fail();
+
+  d.set_next_block(&b2);
+  (d.next() == 'E') || fail();
+  (d.next() == 'Y') || fail();
+  !d.next().take([](auto) { throw 0; }) || fail();
+
+  d.set_next_block(&b3);
+  (d.next() == 'H') || fail();
+  (d.next() == 'E') || fail();
+  (d.next() == 'Y') || fail();
+  !d.next().take([](auto) { throw 0; }) || fail();
+
+  return true;
 }());
