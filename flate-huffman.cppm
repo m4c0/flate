@@ -1,6 +1,7 @@
 export module flate:huffman;
 import :bitstream;
 import hai;
+import missingno;
 
 namespace flate {
 using uint_array = hai::array<unsigned>;
@@ -63,11 +64,7 @@ static constexpr auto max(const unsigned *lens, unsigned max_codes) {
   for (const auto *it = hc.counts.begin() + 1; it != hc.counts.end(); ++it) {
     auto count = *it;
 
-    auto b = bits->next<1>();
-    if (!b.is_valid())
-      return b;
-
-    code |= b.unwrap(0);
+    code |= bits->next<1>();
     if (code < first + count) {
       return mno::req{hc.indexes[index + code - first]};
     }

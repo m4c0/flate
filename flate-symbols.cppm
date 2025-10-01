@@ -25,19 +25,15 @@ static constexpr mno::req<symbol> read_repeat(const tables::huff_tables &huff,
     return mno::req<symbol>::failed("code greater than max lens");
 
   const auto len_bits = tables::bitlens.data[code];
-  return bits->next(len_bits.bits).fmap([&](auto l) {
-    const auto len = len_bits.second + l;
+  const auto len = len_bits.second + bits->next(len_bits.bits);
 
-    return decode_huffman(huff.hdist, bits).fmap([&](auto dist_code) {
-      if (dist_code > tables::max_dists_code)
-        return mno::req<symbol>::failed("dist code greater than max");
+  return decode_huffman(huff.hdist, bits).fmap([&](auto dist_code) {
+    if (dist_code > tables::max_dists_code)
+      return mno::req<symbol>::failed("dist code greater than max");
 
-      const auto dist_bits = tables::bitdists.data[dist_code];
-      return bits->next(dist_bits.bits).map([&](auto d) {
-        const auto dist = dist_bits.second + d;
-        return symbol{type::repeat, len, dist};
-      });
-    });
+    const auto dist_bits = tables::bitdists.data[dist_code];
+    const auto dist = dist_bits.second + bits->next(dist_bits.bits);
+    return mno::req{symbol{type::repeat, len, dist}};
   });
 }
 

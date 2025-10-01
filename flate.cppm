@@ -10,8 +10,6 @@ using namespace traits::ints;
 namespace flate {
 export hai::varray<unsigned char> compress(const void * data, unsigned size);
 
-export struct buffer_underrun {};
-
 export class decompresser {
   bitstream m_bits;
   deflater m_d;

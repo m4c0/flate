@@ -32,14 +32,11 @@ struct dynamic_huffman_format {
 };
 
 [[nodiscard]] inline constexpr auto read_hc_format(bitstream *bits) {
-  dynamic_huffman_format res{};
-  return bits->next<hlit_count_bits>()
-      .map([&](auto hlit) { res.hlit = hlit + hlit_min; })
-      .fmap([&] { return bits->next<hdist_count_bits>(); })
-      .map([&](auto hdist) { res.hdist = hdist + hdist_min; })
-      .fmap([&] { return bits->next<hclen_count_bits>(); })
-      .map([&](auto hclen) { res.hclen = hclen + hclen_min; })
-      .map([&] { return res; });
+  return dynamic_huffman_format {
+    .hlit = bits->next<hlit_count_bits>() + hlit_min,
+    .hdist = bits->next<hdist_count_bits>() + hdist_min,
+    .hclen = bits->next<hclen_count_bits>() + hclen_min,
+  };
 }
 
 [[nodiscard]] inline constexpr auto
@@ -47,8 +44,7 @@ read_hclens(bitstream *bits, const dynamic_huffman_format &fmt) {
   hai::array<unsigned> buffer{max_code_lengths};
   mno::req<void> res{};
   for (int i = 0; i < fmt.hclen && res.is_valid(); i++) {
-    res = bits->next<hclen_bits>().map(
-        [&](auto b) { buffer[hclen_order[i]] = b; });
+    buffer[hclen_order[i]] = bits->next<hclen_bits>();
   }
   return res.map([&] { return traits::move(buffer); });
 }
@@ -72,13 +68,13 @@ constexpr const auto repeat_zero_11_138 = 18;
                                                  bitstream *bits) {
   switch (code) {
   case copy_previous:
-    return bits->next<2>() + mno::req{3U};
+    return bits->next<2>() + 3U;
   case repeat_zero_3_10:
-    return bits->next<3>() + mno::req{3U};
+    return bits->next<3>() + 3U;
   case repeat_zero_11_138:
-    return bits->next<7>() + mno::req{11U}; // NOLINT;
+    return bits->next<7>() + 11U;
   default:
-    return mno::req{1U};
+    return 1U;
   }
 }
 [[nodiscard]] inline constexpr auto
@@ -91,14 +87,11 @@ read_hlit_hdist(const dynamic_huffman_format &fmt,
   auto *it = result.begin();
   mno::req<void> res{};
   while (it != result.end() && res.is_valid()) {
-    res = decode_huffman(huff, bits).fmap([&](auto code) {
+    res = decode_huffman(huff, bits).map([&](auto code) {
       auto to_repeat = code_to_repeat(code, previous);
-      return repeat_count(code, bits).map([&](auto count) {
-        for (int j = 0; j < count; j++) {
-          *it++ = to_repeat;
-        }
-        previous = to_repeat;
-      });
+      auto count = repeat_count(code, bits);
+      for (int j = 0; j < count; j++) *it++ = to_repeat;
+      previous = to_repeat;
     });
   }
   return res.map([&] { return traits::move(result); });
@@ -149,9 +142,9 @@ static_assert([] {
 
   bitstream b { ex1, 410 };
 
-  auto fmt = b.skip<3>() // last block + dynamic
-                 .fmap([&] { return read_hc_format(&b); })
-                 .take(fail_);
+  b.skip<3>(); // last block + dynamic
+
+  auto fmt = read_hc_format(&b);
   (fmt.hlit == 274) || fail();
   (fmt.hdist == 19) || fail();
   (fmt.hclen == 14) || fail();

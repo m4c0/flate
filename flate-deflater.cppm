@@ -18,22 +18,18 @@ export class deflater {
   bool m_last_block{};
   bool m_uncompressed{};
 
-  [[nodiscard]] constexpr mno::req<void> read_huff0_len() {
-    return m_bits->align()
-        .fmap([this] { return m_bits->next<8>() + (m_bits->next<8>() << 8); })
-        .map([this](auto len) { m_len = len; })
-        .fmap([this] {
-          return m_bits->skip<16>(); // NLEN
-        });
+  constexpr void read_huff0_len() {
+    m_bits->align();
+    m_len = m_bits->next<8>() + (m_bits->next<8>() << 8);
+    m_bits->skip<16>(); 
   }
   [[nodiscard]] constexpr mno::req<void> read_huff2_tables() {
-    return details::read_hc_format(m_bits).fmap([this](auto &fmt) {
-      return details::read_hclens(m_bits, fmt).fmap([&](auto &lens) {
-        return details::read_hlit_hdist(fmt, lens, m_bits)
-            .map([&](auto &hlit_hdist) {
-              m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
-            });
-      });
+    auto fmt = details::read_hc_format(m_bits);
+    return details::read_hclens(m_bits, fmt).fmap([&](auto &lens) {
+      return details::read_hlit_hdist(fmt, lens, m_bits)
+        .map([&](auto &hlit_hdist) {
+          m_tables = tables::create_tables(hlit_hdist, fmt.hlit);
+        });
     });
   }
 
@@ -43,11 +39,11 @@ public:
   constexpr void set_next_block(bitstream *b) {
     m_bits = b;
 
-    m_last_block = 1 == m_bits->next<1>().take([](auto) { throw 42; });
-    switch (m_bits->next<2>().take([](auto) { throw 42; })) {
+    m_last_block = 1 == m_bits->next<1>();
+    switch (m_bits->next<2>()) {
       case 0:
         m_uncompressed = true;
-        read_huff0_len().take([](auto) { throw 42; });
+        read_huff0_len();
         break;
       case 1:
         m_uncompressed = false;
@@ -69,7 +65,7 @@ public:
         return {};
       }
       m_len--;
-      return m_bits->next<8>().map([](uint8_t n) { return mno::opt{n}; });
+      return mno::req { mno::opt { static_cast<uint8_t>(m_bits->next<8>()) } };
     }
     if (m_buffer.empty()) {
       return symbols::read_next_symbol(m_tables, m_bits)
