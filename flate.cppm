@@ -26,6 +26,8 @@ public:
   , m_d { deflater::from(&m_bits).take(fail) }
   {}
 
+  constexpr decompresser(const auto & data) : decompresser { data.data(), data.size() } {}
+
   constexpr bool eof() const { return m_d.last_block() && m_finished; }
   constexpr operator bool() const { return !eof(); }
 
@@ -48,8 +50,15 @@ public:
     }
     return i;
   }
+  [[nodiscard]] constexpr int read(auto & buf) {
+    return read(buf.data(), buf.size());
+  }
+
   constexpr void read_all(void * buffer, unsigned size) {
     if (read(buffer, size) != size) throw 42; // TODO: define error strategy
+  }
+  constexpr void read_all(auto & buf) {
+    return read(buf.data(), buf.size());
   }
 };
 } // namespace flate

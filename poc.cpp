@@ -29,6 +29,6 @@ int main() {
   putfn("Compressed to %d bytes", comp.size()); 
 
   hai::array<uint8_t> decomp{10240};
-  auto n = flate::decompresser { comp.begin(), comp.size() }.read(decomp.begin(), decomp.size());
+  auto n = flate::decompresser { comp }.read(decomp);
   putfn("Got %d bytes back", n);
 }
