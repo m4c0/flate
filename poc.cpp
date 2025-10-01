@@ -29,8 +29,7 @@ int main() {
   auto comp = flate::compress(lorem_ipsum, sizeof(lorem_ipsum));
   putfn("Compressed to %d bytes", comp.size()); 
 
-  yoyo::memreader rd{comp.begin(), comp.size()};
-  flate::bitstream bs{&rd};
+  flate::bitstream bs { comp.begin(), comp.size() };
   hai::array<uint8_t> decomp{10240};
 
   return flate::huffman_reader::create(&bs)
@@ -39,8 +38,5 @@ int main() {
       })
       .map([](auto n) { putfn("Got %d bytes back", n); })
       .map([] { return 0; })
-      .log_error([&] {
-        putfn("Total of %d bytes read before error", rd.raw_pos());
-        return 1;
-      });
+      .log_error([&] { return 1; });
 }

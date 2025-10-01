@@ -106,7 +106,7 @@ read_hlit_hdist(const dynamic_huffman_format &fmt,
 }
 } // namespace flate::details
 
-static constexpr const yoyo::ce_reader ex1{
+static constexpr const unsigned char ex1[410] {
     0x8d, 0x52, 0x4d, 0x6b, 0x83, 0x40, 0x10, 0xbd, 0xfb, 0x2b, 0x06, 0x0b,
     0x21, 0xa1, 0x98, 0x98, 0xd4, 0xe4, 0xa0, 0x78, 0x28, 0xb4, 0xf7, 0xde,
     0x9b, 0x22, 0xdb, 0xdd, 0x31, 0x91, 0xe8, 0xae, 0xcc, 0xae, 0xc5, 0xa6,
@@ -148,7 +148,7 @@ static_assert([] {
   constexpr const auto fail = [] -> bool { throw 0; };
   constexpr const auto fail_ = [](auto) { throw 0; };
 
-  ce_bitstream b{ex1};
+  bitstream b { ex1, 410 };
 
   auto fmt = b.skip<3>() // last block + dynamic
                  .fmap([&] { return read_hc_format(&b); })

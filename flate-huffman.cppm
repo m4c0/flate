@@ -132,8 +132,8 @@ static_assert([] {
 static_assert([] {
   const auto lens = uint_array::make(3, 3, 3, 3, 3, 2, 4, 4);
   const auto hfc = create_huffman_codes(lens.begin(), lens.size());
-  auto r = yoyo::ce_reader{0b11100100, 0b01111011}; // NOLINT
-  bitstream b{&r};
+  const unsigned char buf[] { 0b11100100, 0b01111011 }; // NOLINT
+  bitstream b { buf, 2 };
 
   const auto expected_result = uint_array::make(5, 2, 7, 3, 6);
   for (auto er : expected_result) {

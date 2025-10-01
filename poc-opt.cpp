@@ -15,8 +15,7 @@ static auto compress(const hai::array<char> &data) {
 
 static auto decompress(const hai::varray<uint8_t> &data) {
   putfn("decompressing %d bytes", data.size());
-  yoyo::memreader rd{data.begin(), data.size()};
-  flate::bitstream bs{&rd};
+  flate::bitstream bs { data.begin(), data.size() };
   return flate::huffman_reader::create(&bs)
       .fmap([&](auto &hr) {
         hai::array<uint8_t> dec{1024 * 1024};

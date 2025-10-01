@@ -74,7 +74,7 @@ static constexpr auto build_sparse_huff() {
   };
 }
 static constexpr auto test_read_next_symbol(uint8_t data, symbol expected) {
-  auto bits = flate::ce_bitstream{yoyo::ce_reader{data}};
+  auto bits = flate::bitstream { &data, 1 };
   auto sym =
       read_next_symbol(build_sparse_huff(), &bits).take([](auto) { throw 0; });
   if (sym.type != expected.type)
@@ -93,7 +93,8 @@ static_assert(test_read_next_symbol(0b11100101, symbol{type::repeat, 24, 12}));
 
 static constexpr auto test_fixed_table(uint8_t first_byte, uint8_t second_byte,
                                        symbol expected) {
-  auto bits = flate::ce_bitstream{yoyo::ce_reader{first_byte, second_byte, 0}};
+  const unsigned char buf[] { first_byte, second_byte, 0 };
+  auto bits = flate::bitstream { buf, 3 };
   auto sym =
       read_next_symbol(flate::tables::create_fixed_huffman_table(), &bits)
           .take([](auto) { throw 0; });

@@ -96,7 +96,7 @@ public:
 };
 } // namespace flate
 
-constexpr const yoyo::ce_reader real_zip_block_example{
+constexpr const unsigned char real_zip_block_example[410] {
     0x8d, 0x52, 0x4d, 0x6b, 0x83, 0x40, 0x10, 0xbd, 0xfb, 0x2b, 0x06, 0x0b,
     0x21, 0xa1, 0x98, 0x98, 0xd4, 0xe4, 0xa0, 0x78, 0x28, 0xb4, 0xf7, 0xde,
     0x9b, 0x22, 0xdb, 0xdd, 0x31, 0x91, 0xe8, 0xae, 0xcc, 0xae, 0xc5, 0xa6,
@@ -131,7 +131,7 @@ constexpr const yoyo::ce_reader real_zip_block_example{
     0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
 };
 static_assert([] {
-  ce_bitstream b{real_zip_block_example};
+  bitstream b { real_zip_block_example, 410 };
   return flate::deflater::from(&b)
       .assert([](auto &d) { return d.next() == '#'; }, "#")
       .assert([](auto &d) { return d.next() == 'i'; }, "i")
@@ -140,12 +140,13 @@ static_assert([] {
       .unwrap(false);
 }());
 static_assert([] {
-  ce_bitstream b{yoyo::ce_reader{
+  const unsigned char data[] {
       1,     // Last bit + Uncompressed
       2, 0,  // LEN
       0, 0,  // NLEN
       93, 15 // DATA
-  }};
+  };
+  bitstream b { data, 7 };
   return flate::deflater::from(&b)
       .assert([](auto &d) { return d.next() == 93; }, "93")
       .assert([](auto &d) { return d.next() == 15; }, "15")
@@ -160,12 +161,15 @@ static_assert([] {
 
   // Tests with fixed huffman table
   // H = 00110000 + 01001000 = 01111000
-  ce_bitstream b1{yoyo::ce_reader{0b11110011, 0, 0}};
+  const unsigned char buf1[] { 0b11110011, 0, 0 };
+  bitstream b1 { buf1, 3 };
   // E = 00110000 + 01000101 = 01110101
   // Y = 00110000 + 01011001 = 10001001
-  ce_bitstream b2{yoyo::ce_reader{0b01110011, 0b10001101, 0b100, 0}};
+  const unsigned char buf2[] { 0b01110011, 0b10001101, 0b100, 0 };
+  bitstream b2 { buf2, 4 };
   // repeat{3, 3} = {257, 2} = {0000001, 00010}
-  ce_bitstream b3{yoyo::ce_reader{0b00000011, 0b0100010, 0}};
+  const unsigned char buf3[] { 0b00000011, 0b0100010, 0 };
+  bitstream b3 { buf3, 3 };
 
   return flate::deflater::from(&b1)
       .assert([](auto &d) { return d.next() == 'H'; }, "H")

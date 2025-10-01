@@ -1,23 +1,28 @@
 export module flate:bitstream;
-import yoyo;
+import missingno;
 
 namespace flate {
 export class bitstream {
   static constexpr const auto max_bits_at_once = 8;
   static constexpr const auto bits_per_byte = 8U;
 
-  yoyo::reader *m_reader;
+  const unsigned char * m_comp_ptr;
+  unsigned m_comp_rem;
 
   unsigned m_rem{};
   unsigned m_buf{};
 
   constexpr auto prepare_next(unsigned n) {
-    if (m_rem >= n)
-      return mno::req<void>{};
-    return m_reader->read_u8().map([this](auto next) {
-      m_buf = m_buf + (next << m_rem);
-      m_rem += bits_per_byte;
-    });
+    if (m_rem >= n) return mno::req<void>{};
+
+    if (m_comp_rem == 0) return mno::req<void>::failed("buffer underrun");
+    auto next = *m_comp_ptr++;
+    m_comp_rem--;
+
+    m_buf = m_buf + (next << m_rem);
+    m_rem += bits_per_byte;
+
+    return mno::req<void> {};
   }
   [[nodiscard]] constexpr auto next_tiny(unsigned n) {
     // assert(n <= max_bits_at_once);
@@ -30,7 +35,10 @@ export class bitstream {
   }
 
 public:
-  explicit constexpr bitstream(yoyo::reader *r) : m_reader{r} {}
+  explicit constexpr bitstream(const unsigned char * ptr, unsigned sz) :
+    m_comp_ptr { ptr }
+  , m_comp_rem { sz }
+  {}
 
   [[nodiscard]] constexpr auto align() noexcept {
     return (m_rem > 0) ? next_tiny(m_rem).map([](auto) {}) : mno::req<void>{};
@@ -73,26 +81,17 @@ public:
   }
 
   [[nodiscard]] constexpr auto eof() const noexcept {
-    return m_reader->eof().map([this](auto eof) { return eof && m_rem == 0; });
+    return m_comp_rem == 0 && m_rem == 0;
   }
-};
-
-template <typename Reader> class ce_bitstream : public bitstream {
-  Reader m_real_reader;
-
-public:
-  explicit constexpr ce_bitstream(Reader r)
-      : bitstream{&m_real_reader}, m_real_reader{r} {};
 };
 } // namespace flate
 
 using namespace flate;
 
-static constexpr const yoyo::ce_reader data{0x8d, 0x52, 0x4d};
+static inline constexpr const unsigned char data[] { 0x8d, 0x52, 0x4d };
 
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   if (b.next<1>() != 1)
     return false;
   if (b.next<2>() != 0b10)
@@ -111,54 +110,46 @@ static_assert([] {
 }());
 // Skip nothing from beginning
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   return b.skip<0>().map([&] { return b.next<1>() == 1; }).unwrap(false);
 }());
 // Skip nothing from somewhere
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   if (b.next<1>() != 1)
     return false;
   return b.skip<2>().map([&] { return b.next<5>() == 17; }).unwrap(false);
 }());
 // Skip from beginning
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   return b.skip<3>().map([&] { return b.next<5>() == 17; }).unwrap(false);
 }());
 static_assert([] {
   constexpr const auto bits_to_skip = 1 + 2 + 5 + 5 + 4;
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   return b.skip<bits_to_skip>()
       .map([&] { return b.next<3>() == 6 && b.next<3>() == 4; })
       .unwrap(false);
 }());
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   return b.next(1) == 1 && b.next(2) == 2 && b.next(5) == 17;
 }());
 static_assert([] {
-  constexpr const yoyo::ce_reader data{0xA0, 0x5A, 0x05};
-  auto r = data;
-  bitstream b{&r};
+  constexpr const unsigned char data[] { 0xA0, 0x5A, 0x05 };
+  bitstream b { data, 3 };
   return b.skip<4>()
       .map([&] { return b.next(8) == 0xAA && b.next(8) == 0x55; })
       .unwrap(false);
 }());
 static_assert([] {
-  constexpr const yoyo::ce_reader data{0x40, 0x23, 0x01};
-  auto r = data;
-  bitstream b{&r};
+  constexpr const unsigned char data[] { 0x40, 0x23, 0x01 };
+  bitstream b { data, 3 };
   return b.skip<4>().map([&] { return b.next(16) == 0x1234; }).unwrap(false);
 }());
 static_assert([] {
-  auto r = data;
-  bitstream b{&r};
+  bitstream b { data, 3 };
   return b.skip<4>()
       .fmap([&] { return b.align(); })
       .fmap([&] {
