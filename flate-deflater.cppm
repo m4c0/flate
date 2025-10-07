@@ -3,7 +3,6 @@ import :bitstream;
 import :buffer;
 import :details;
 import :symbols;
-import missingno;
 import traits;
 
 using namespace traits::ints;
@@ -56,24 +55,28 @@ public:
     }
   }
 
-  [[nodiscard]] constexpr mno::opt<uint8_t> next() {
+  [[nodiscard]] constexpr auto next() {
+    struct res {
+      uint8_t u;
+      bool ok;
+    };
     //assert(m_bits != nullptr);
     if (m_uncompressed) {
       if (m_len == 0) {
-        return {};
+        return res {};
       }
       m_len--;
-      return mno::opt { static_cast<uint8_t>(m_bits->next<8>()) };
+      return res { static_cast<uint8_t>(m_bits->next<8>()), true };
     }
     if (m_buffer.empty()) {
       auto sym = symbols::read_next_symbol(m_tables, m_bits);
       if (!m_buffer.visit(sym)) {
         m_bits = nullptr;
-        return {};
+        return res {};
       }
-      return mno::opt<uint8_t> { m_buffer.read() };
+      return res { m_buffer.read(), true };
     }
-    return mno::opt<uint8_t> { m_buffer.read() };
+    return res { m_buffer.read(), true };
   }
 
   [[nodiscard]] constexpr auto last_block() const noexcept {
@@ -116,13 +119,18 @@ constexpr const unsigned char real_zip_block_example[410] {
     0x4d, 0xc3, 0xbf, 0x1e, 0x67, 0x98, 0xc3, 0x68, 0xd4, 0x23, 0x83, 0x91,
     0xf4, 0x62, 0xea, 0x88, 0x9f, 0x84, 0xd3, 0x2b, 0x1b, 0xa7, 0xa8, 0xdf,
 };
-static constexpr bool fail() { throw 0; }
+static inline constexpr bool fail() { throw 0; }
+static inline constexpr void assert_next(deflater & d, unsigned char c) {
+  auto [u, ok] = d.next();
+  if (!ok) fail();
+  if (u != c) fail();
+}
 static_assert([] {
   bitstream b { real_zip_block_example, 410 };
   deflater d { &b };
-  (d.next() == '#') || fail();
-  (d.next() == 'i') || fail();
-  (d.next() == 'n') || fail();
+  assert_next(d, '#');
+  assert_next(d, 'i');
+  assert_next(d, 'n');
   return true;
 }());
 static_assert([] {
@@ -134,9 +142,9 @@ static_assert([] {
   };
   bitstream b { data, 7 };
   deflater d { &b };
-  (d.next() == 93) || fail();
-  (d.next() == 15) || fail();
-  return !d.next();
+  assert_next(d, 93);
+  assert_next(d, 15);
+  return !d.next().ok;
 }());
 static_assert([] {
   // Tests with fixed huffman table
@@ -153,19 +161,19 @@ static_assert([] {
 
   deflater d { &b1 };
 
-  (d.next() == 'H') || fail();
-  !d.next() || fail();
+  assert_next(d, 'H');
+  !d.next().ok || fail();
 
   d.set_next_block(&b2);
-  (d.next() == 'E') || fail();
-  (d.next() == 'Y') || fail();
-  !d.next() || fail();
+  assert_next(d, 'E');
+  assert_next(d, 'Y');
+  !d.next().ok || fail();
 
   d.set_next_block(&b3);
-  (d.next() == 'H') || fail();
-  (d.next() == 'E') || fail();
-  (d.next() == 'Y') || fail();
-  !d.next() || fail();
+  assert_next(d, 'H');
+  assert_next(d, 'E');
+  assert_next(d, 'Y');
+  !d.next().ok || fail();
 
   return true;
 }());

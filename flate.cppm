@@ -30,9 +30,9 @@ public:
     auto ptr = static_cast<unsigned char *>(buffer);
     auto i = 0;
     while (!eof() && i < size) {
-      auto r = m_d.next();
-      if (r) {
-        ptr[i++] = r.unwrap(0U);
+      auto [u, ok] = m_d.next();
+      if (ok) {
+        ptr[i++] = u;
         continue;
       }
 
